@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera } from '@capacitor/camera';
+import { SpeechRecognition } from '@capacitor-community/speech-recognition';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -86,16 +86,55 @@ const QuantumAI = () => {
     }
   };
 
-  const toggleListening = () => {
-    setIsListening(!isListening);
-    if (!isListening) {
-      // Симуляция распознавания речи
-      setTimeout(() => {
-        setMessages(prev => [...prev, 
-          { text: "Я слышу ваш голос... анализирую интонации и эмоции.", sender: 'ai' }
-        ]);
+  const toggleListening = async () => {
+    try {
+      if (!isListening) {
+        // Проверяем доступность SpeechRecognition
+        const available = await SpeechRecognition.available();
+        if (available) {
+          await SpeechRecognition.start({
+            language: 'ru-RU',
+            maxResults: 1,
+            prompt: 'Говорите...',
+            partialResults: true,
+            popup: false,
+          });
+          setIsListening(true);
+          
+          SpeechRecognition.addListener('partialResults', (data: any) => {
+            console.log('Partial results:', data.matches);
+          });
+          
+          SpeechRecognition.addListener('listeningState', (data: any) => {
+            setIsListening(data.listening);
+          });
+        } else {
+          // Fallback для браузера без native speech recognition
+          console.log('Speech recognition not available, using fallback');
+          setIsListening(true);
+          setTimeout(() => {
+            setMessages(prev => [...prev, 
+              { text: "Я слышу ваш голос... анализирую интонации и эмоции.", sender: 'ai' }
+            ]);
+            setIsListening(false);
+          }, 3000);
+        }
+      } else {
+        await SpeechRecognition.stop();
         setIsListening(false);
-      }, 3000);
+      }
+    } catch (error) {
+      console.log('Speech recognition error:', error);
+      // Fallback
+      setIsListening(!isListening);
+      if (!isListening) {
+        setTimeout(() => {
+          setMessages(prev => [...prev, 
+            { text: "Я слышу ваш голос... анализирую интонации и эмоции.", sender: 'ai' }
+          ]);
+          setIsListening(false);
+        }, 3000);
+      }
     }
   };
 
