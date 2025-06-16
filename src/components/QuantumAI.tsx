@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera } from '@capacitor/camera';
-import { SpeechRecognition } from '@capacitor-community/speech-recognition';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -88,40 +86,74 @@ const QuantumAI = () => {
 
   const toggleListening = async () => {
     try {
-      if (!isListening) {
-        // Проверяем доступность SpeechRecognition
-        const available = await SpeechRecognition.available();
-        if (available) {
-          await SpeechRecognition.start({
-            language: 'ru-RU',
-            maxResults: 1,
-            prompt: 'Говорите...',
-            partialResults: true,
-            popup: false,
-          });
-          setIsListening(true);
-          
-          SpeechRecognition.addListener('partialResults', (data: any) => {
-            console.log('Partial results:', data.matches);
-          });
-          
-          SpeechRecognition.addListener('listeningState', (data: any) => {
-            setIsListening(data.listening);
-          });
+      // Check if we're in a Capacitor environment
+      if (typeof window !== 'undefined' && (window as any).Capacitor) {
+        // Dynamically import Capacitor modules only when available
+        const { SpeechRecognition } = await import('@capacitor-community/speech-recognition');
+        
+        if (!isListening) {
+          const available = await SpeechRecognition.available();
+          if (available) {
+            await SpeechRecognition.start({
+              language: 'ru-RU',
+              maxResults: 1,
+              prompt: 'Говорите...',
+              partialResults: true,
+              popup: false,
+            });
+            setIsListening(true);
+            
+            SpeechRecognition.addListener('partialResults', (data: any) => {
+              console.log('Partial results:', data.matches);
+            });
+            
+            SpeechRecognition.addListener('listeningState', (data: any) => {
+              setIsListening(data.listening);
+            });
+          }
         } else {
-          // Fallback для браузера без native speech recognition
-          console.log('Speech recognition not available, using fallback');
-          setIsListening(true);
-          setTimeout(() => {
-            setMessages(prev => [...prev, 
-              { text: "Я слышу ваш голос... анализирую интонации и эмоции.", sender: 'ai' }
-            ]);
-            setIsListening(false);
-          }, 3000);
+          await SpeechRecognition.stop();
+          setIsListening(false);
         }
       } else {
-        await SpeechRecognition.stop();
-        setIsListening(false);
+        // Web fallback using browser's SpeechRecognition API
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+          const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+          const recognition = new SpeechRecognition();
+          recognition.lang = 'ru-RU';
+          recognition.continuous = false;
+          recognition.interimResults = true;
+          
+          if (!isListening) {
+            recognition.start();
+            setIsListening(true);
+            
+            recognition.onresult = (event: any) => {
+              const transcript = event.results[0][0].transcript;
+              setMessages(prev => [...prev, 
+                { text: `Я услышал: "${transcript}"`, sender: 'ai' }
+              ]);
+            };
+            
+            recognition.onend = () => {
+              setIsListening(false);
+            };
+          } else {
+            recognition.stop();
+            setIsListening(false);
+          }
+        } else {
+          // Simple fallback for environments without speech recognition
+          setIsListening(!isListening);
+          if (!isListening) {
+            setTimeout(() => {
+              setMessages(prev => [...prev, 
+                { text: "Я слышу ваш голос... анализирую интонации и эмоции.", sender: 'ai' }
+              ]);
+              setIsListening(false);
+            }, 3000);
+          }
+        }
       }
     } catch (error) {
       console.log('Speech recognition error:', error);
