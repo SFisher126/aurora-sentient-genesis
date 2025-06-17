@@ -69,8 +69,8 @@ export const useQuantumAI = () => {
       ...prev,
       conversationHistory: [
         ...prev.conversationHistory,
-        { message: userMessage, sender: 'user', timestamp: new Date() },
-        { message: response.text, sender: 'ai', timestamp: new Date() }
+        { message: userMessage, sender: 'user' as const, timestamp: new Date() },
+        { message: response.text, sender: 'ai' as const, timestamp: new Date() }
       ].slice(-20), // Храним последние 20 сообщений
       relationshipLevel: Math.min(100, prev.relationshipLevel + 2)
     }));
