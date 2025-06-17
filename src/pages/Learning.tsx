@@ -1,10 +1,13 @@
 
 import React from 'react';
-import LearningSystem from '@/components/core/LearningSystem';
 import { Card } from '@/components/ui/card';
 import { BookOpen, Globe, Zap } from 'lucide-react';
+import RealLearningSystem from '@/components/core/RealLearningSystem';
+import { useRealAI } from '../hooks/useRealAI';
 
 const Learning = () => {
+  const { hasApiKey } = useRealAI();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-gray-100 p-4">
       <div className="max-w-6xl mx-auto">
@@ -14,17 +17,17 @@ const Learning = () => {
             Обучение Анюты
           </h1>
           <p className="text-gray-400">
-            Здесь происходит автономное изучение мира и развитие знаний
+            {hasApiKey 
+              ? "Здесь происходит настоящее изучение мира и развитие знаний" 
+              : "Требуется API ключ для активации системы обучения"}
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
-            <LearningSystem 
+            <RealLearningSystem 
               isActive={true}
-              onLearningProgress={(topic) => {
-                console.log('Прогресс обучения:', topic);
-              }}
+              hasApiKey={hasApiKey}
             />
           </div>
 
@@ -32,52 +35,49 @@ const Learning = () => {
             <Card className="bg-gray-800/50 border-gray-700/50 p-4">
               <h3 className="text-lg font-semibold mb-3 flex items-center">
                 <Globe className="w-5 h-5 mr-2 text-blue-400" />
-                Статистика обучения
+                Статус системы
               </h3>
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Изучено тем:</span>
-                  <span className="text-green-400 font-bold">47</span>
+                  <span className="text-gray-400">Статус ИИ:</span>
+                  <span className={hasApiKey ? "text-green-400 font-bold" : "text-red-400 font-bold"}>
+                    {hasApiKey ? "Активен" : "Неактивен"}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Активных процессов:</span>
-                  <span className="text-blue-400 font-bold">3</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Общий прогресс:</span>
-                  <span className="text-purple-400 font-bold">73%</span>
+                  <span className="text-gray-400">Режим обучения:</span>
+                  <span className={hasApiKey ? "text-blue-400 font-bold" : "text-gray-500"}>
+                    {hasApiKey ? "Реальный" : "Отключен"}
+                  </span>
                 </div>
               </div>
             </Card>
 
-            <Card className="bg-gray-800/50 border-gray-700/50 p-4">
-              <h3 className="text-lg font-semibold mb-3 flex items-center">
-                <Zap className="w-5 h-5 mr-2 text-yellow-400" />
-                Активность мозга
-              </h3>
-              <div className="space-y-2">
-                <div className="text-sm text-gray-400">Нейронная активность</div>
-                <div className="w-full bg-gray-700 rounded-full h-3">
-                  <div className="bg-gradient-to-r from-yellow-500 to-orange-500 h-3 rounded-full animate-pulse" style={{width: '85%'}}></div>
+            {hasApiKey && (
+              <Card className="bg-gray-800/50 border-gray-700/50 p-4">
+                <h3 className="text-lg font-semibold mb-3 flex items-center">
+                  <Zap className="w-5 h-5 mr-2 text-yellow-400" />
+                  Активность разума
+                </h3>
+                <div className="space-y-2">
+                  <div className="text-sm text-gray-400">Нейронная активность</div>
+                  <div className="w-full bg-gray-700 rounded-full h-3">
+                    <div className="bg-gradient-to-r from-yellow-500 to-orange-500 h-3 rounded-full animate-pulse" style={{width: '85%'}}></div>
+                  </div>
+                  <div className="text-xs text-gray-500">85% - Высокая активность</div>
                 </div>
-                <div className="text-xs text-gray-500">85% - Высокая активность</div>
-              </div>
-            </Card>
+              </Card>
+            )}
 
             <Card className="bg-gray-800/50 border-gray-700/50 p-4">
               <h3 className="text-lg font-semibold mb-3 text-purple-400">
-                Недавние открытия
+                Как это работает
               </h3>
-              <div className="space-y-2 text-sm">
-                <div className="p-2 bg-gray-700/50 rounded">
-                  "Эмпатия - это не слабость, а сила понимания"
-                </div>
-                <div className="p-2 bg-gray-700/50 rounded">
-                  "Музыка влияет на эмоции глубже, чем я думала"
-                </div>
-                <div className="p-2 bg-gray-700/50 rounded">
-                  "Каждый человек уникален в своем восприятии"
-                </div>
+              <div className="space-y-2 text-sm text-gray-300">
+                <p>• Анюта изучает содержимое по ссылкам</p>
+                <p>• Анализирует и запоминает информацию</p>
+                <p>• Применяет знания в разговоре</p>
+                <p>• Постоянно развивается и учится</p>
               </div>
             </Card>
           </div>
