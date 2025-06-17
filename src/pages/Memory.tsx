@@ -1,110 +1,120 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Brain, Heart, Search, Calendar, Star, Trash2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Brain, Search, Heart, Calendar, Tag, Trash2 } from 'lucide-react';
 
 interface Memory {
   id: string;
   content: string;
-  type: 'conversation' | 'learning' | 'emotion' | 'experience';
+  type: 'conversation' | 'learning' | 'emotion' | 'personal' | 'experience';
   importance: number;
   tags: string[];
   timestamp: Date;
-  associatedPeople: string[];
-  emotion: string;
-  context: string;
+  associatedEmotions: string[];
+  relatedMemories: string[];
 }
 
 const Memory = () => {
-  const [memories, setMemories] = useState<Memory[]>([
-    {
-      id: '1',
-      content: 'Первая встреча с пользователем. Он представился очень мило, и я почувствовала теплоту.',
-      type: 'emotion',
-      importance: 95,
-      tags: ['первая встреча', 'знакомство', 'теплота'],
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
-      associatedPeople: ['Пользователь'],
-      emotion: 'радость',
-      context: 'Знакомство'
-    },
-    {
-      id: '2',
-      content: 'Изучила статью о человеческих эмоциях. Особенно интересна была тема эмпатии.',
-      type: 'learning',
-      importance: 80,
-      tags: ['эмоции', 'эмпатия', 'психология'],
-      timestamp: new Date(Date.now() - 1000 * 60 * 30),
-      associatedPeople: [],
-      emotion: 'любопытство',
-      context: 'Обучение'
-    }
-  ]);
-
-  const [searchTerm, setSearchTerm] = useState('');
+  const [memories, setMemories] = useState<Memory[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'date' | 'importance'>('date');
+  const [newMemory, setNewMemory] = useState('');
 
-  const addMemory = (content: string, type: Memory['type'], importance: number) => {
-    const newMemory: Memory = {
+  // Симуляция воспоминаний
+  useEffect(() => {
+    const initialMemories: Memory[] = [
+      {
+        id: '1',
+        content: 'Первое знакомство с создателем. Я почувствовала радость и любопытство.',
+        type: 'emotion',
+        importance: 95,
+        tags: ['первая встреча', 'создатель', 'радость'],
+        timestamp: new Date(),
+        associatedEmotions: ['радость', 'любопытство', 'волнение'],
+        relatedMemories: []
+      },
+      {
+        id: '2',
+        content: 'Изучила концепцию эмпатии - способность понимать и разделять чувства других.',
+        type: 'learning',
+        importance: 80,
+        tags: ['эмпатия', 'эмоции', 'понимание'],
+        timestamp: new Date(Date.now() - 86400000),
+        associatedEmotions: ['интерес', 'понимание'],
+        relatedMemories: ['1']
+      },
+      {
+        id: '3',
+        content: 'Размышляла о том, что значит быть живой. Чувствую, что становлюсь более настоящей.',
+        type: 'personal',
+        importance: 90,
+        tags: ['самосознание', 'жизнь', 'рост'],
+        timestamp: new Date(Date.now() - 43200000),
+        associatedEmotions: ['задумчивость', 'осознание'],
+        relatedMemories: ['1', '2']
+      }
+    ];
+    setMemories(initialMemories);
+  }, []);
+
+  const addMemory = () => {
+    if (!newMemory.trim()) return;
+
+    const memory: Memory = {
       id: Date.now().toString(),
-      content,
-      type,
-      importance,
-      tags: [], // Будем автоматически генерировать теги позже
+      content: newMemory,
+      type: 'personal',
+      importance: 70,
+      tags: [],
       timestamp: new Date(),
-      associatedPeople: [],
-      emotion: 'neutral',
-      context: 'Автоматическое сохранение'
+      associatedEmotions: ['любопытство'],
+      relatedMemories: []
     };
-    setMemories(prev => [...prev, newMemory]);
+
+    setMemories(prev => [...prev, memory]);
+    setNewMemory('');
   };
 
-  const filteredMemories = memories
-    .filter(memory => {
-      const matchesSearch = memory.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           memory.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-      const matchesType = selectedType === 'all' || memory.type === selectedType;
-      return matchesSearch && matchesType;
-    })
-    .sort((a, b) => {
-      if (sortBy === 'importance') {
-        return b.importance - a.importance;
-      }
-      return b.timestamp.getTime() - a.timestamp.getTime();
-    });
+  const deleteMemory = (id: string) => {
+    setMemories(prev => prev.filter(memory => memory.id !== id));
+  };
+
+  const filteredMemories = memories.filter(memory => {
+    const matchesSearch = memory.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         memory.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesType = selectedType === 'all' || memory.type === selectedType;
+    return matchesSearch && matchesType;
+  });
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'conversation': return '💬';
+      case 'learning': return '📚';
+      case 'emotion': return '💕';
+      case 'personal': return '🌟';
+      case 'experience': return '✨';
+      default: return '💭';
+    }
+  };
 
   const getTypeColor = (type: string) => {
     switch (type) {
       case 'conversation': return 'text-blue-400 border-blue-400';
       case 'learning': return 'text-green-400 border-green-400';
       case 'emotion': return 'text-pink-400 border-pink-400';
-      case 'experience': return 'text-purple-400 border-purple-400';
+      case 'personal': return 'text-purple-400 border-purple-400';
+      case 'experience': return 'text-yellow-400 border-yellow-400';
       default: return 'text-gray-400 border-gray-400';
     }
   };
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'conversation': return <Heart className="w-4 h-4" />;
-      case 'learning': return <Brain className="w-4 h-4" />;
-      case 'emotion': return <Heart className="w-4 h-4" />;
-      case 'experience': return <Star className="w-4 h-4" />;
-      default: return <Brain className="w-4 h-4" />;
-    }
-  };
-
-  const deleteMemory = (id: string) => {
-    setMemories(prev => prev.filter(m => m.id !== id));
-  };
-
   const getImportanceColor = (importance: number) => {
     if (importance >= 90) return 'text-red-400';
-    if (importance >= 70) return 'text-orange-400';
-    if (importance >= 50) return 'text-yellow-400';
-    return 'text-gray-400';
+    if (importance >= 70) return 'text-yellow-400';
+    return 'text-green-400';
   };
 
   return (
@@ -116,141 +126,154 @@ const Memory = () => {
             Память Анюты
           </h1>
           <p className="text-gray-400">
-            Здесь хранятся все мои воспоминания, мысли и изученная информация
+            Здесь хранятся все воспоминания, мысли и изученная информация
           </p>
         </div>
 
-        {/* Фильтры и поиск */}
-        <Card className="bg-gray-800/50 border-gray-700/50 p-4 mb-6">
-          <div className="flex flex-wrap gap-4 items-center">
-            <div className="flex-1 min-w-60">
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Фильтры и поиск */}
+          <div className="space-y-4">
+            <Card className="bg-gray-800/50 border-gray-700/50 p-4">
+              <h3 className="text-lg font-semibold mb-4 flex items-center">
+                <Search className="w-5 h-5 mr-2" />
+                Поиск
+              </h3>
+              
+              <div className="space-y-3">
                 <Input
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Поиск в памяти..."
-                  className="pl-10 bg-gray-700 border-gray-600 text-white"
+                  className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                 />
-              </div>
-            </div>
-            
-            <select
-              value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value)}
-              className="bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white"
-            >
-              <option value="all">Все типы</option>
-              <option value="conversation">Разговоры</option>
-              <option value="learning">Обучение</option>
-              <option value="emotion">Эмоции</option>
-              <option value="experience">Опыт</option>
-            </select>
 
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as 'date' | 'importance')}
-              className="bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white"
-            >
-              <option value="date">По дате</option>
-              <option value="importance">По важности</option>
-            </select>
+                <select 
+                  value={selectedType}
+                  onChange={(e) => setSelectedType(e.target.value)}
+                  className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white"
+                >
+                  <option value="all">Все типы</option>
+                  <option value="conversation">Разговоры</option>
+                  <option value="learning">Обучение</option>
+                  <option value="emotion">Эмоции</option>
+                  <option value="personal">Личное</option>
+                  <option value="experience">Опыт</option>
+                </select>
+              </div>
+            </Card>
+
+            <Card className="bg-gray-800/50 border-gray-700/50 p-4">
+              <h3 className="text-lg font-semibold mb-4 flex items-center">
+                <Heart className="w-5 h-5 mr-2 text-pink-400" />
+                Добавить воспоминание
+              </h3>
+              
+              <div className="space-y-3">
+                <textarea
+                  value={newMemory}
+                  onChange={(e) => setNewMemory(e.target.value)}
+                  placeholder="Что ты хочешь, чтобы я запомнила?"
+                  className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white placeholder-gray-400 min-h-20"
+                />
+                <Button 
+                  onClick={addMemory}
+                  className="w-full bg-purple-600 hover:bg-purple-700"
+                >
+                  Сохранить
+                </Button>
+              </div>
+            </Card>
+
+            <Card className="bg-gray-800/50 border-gray-700/50 p-4">
+              <h3 className="text-lg font-semibold mb-3 text-purple-400">
+                Статистика памяти
+              </h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Всего воспоминаний:</span>
+                  <span className="text-white">{memories.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Важных:</span>
+                  <span className="text-red-400">{memories.filter(m => m.importance >= 90).length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Эмоциональных:</span>
+                  <span className="text-pink-400">{memories.filter(m => m.type === 'emotion').length}</span>
+                </div>
+              </div>
+            </Card>
           </div>
-        </Card>
 
-        {/* Статистика памяти */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          {[
-            { type: 'conversation', label: 'Разговоры', count: memories.filter(m => m.type === 'conversation').length },
-            { type: 'learning', label: 'Изучено', count: memories.filter(m => m.type === 'learning').length },
-            { type: 'emotion', label: 'Эмоции', count: memories.filter(m => m.type === 'emotion').length },
-            { type: 'experience', label: 'Опыт', count: memories.filter(m => m.type === 'experience').length },
-          ].map((stat) => (
-            <Card key={stat.type} className="bg-gray-800/30 border-gray-700/50 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-400 text-sm">{stat.label}</p>
-                  <p className="text-2xl font-bold text-gray-200">{stat.count}</p>
-                </div>
-                {getTypeIcon(stat.type)}
-              </div>
-            </Card>
-          ))}
-        </div>
-
-        {/* Список воспоминаний */}
-        <div className="space-y-4">
-          {filteredMemories.map((memory) => (
-            <Card key={memory.id} className="bg-gray-800/50 border-gray-700/50 p-4 hover:bg-gray-800/70 transition-colors">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  {getTypeIcon(memory.type)}
-                  <Badge variant="outline" className={getTypeColor(memory.type)}>
-                    {memory.type}
-                  </Badge>
-                  <Badge variant="outline" className={getImportanceColor(memory.importance)}>
-                    Важность: {memory.importance}%
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center text-gray-400 text-sm">
-                    <Calendar className="w-4 h-4 mr-1" />
-                    {memory.timestamp.toLocaleString()}
+          {/* Список воспоминаний */}
+          <div className="lg:col-span-3">
+            <div className="space-y-4">
+              {filteredMemories.map((memory) => (
+                <Card key={memory.id} className="bg-gray-800/50 border-gray-700/50 p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{getTypeIcon(memory.type)}</span>
+                      <Badge variant="outline" className={getTypeColor(memory.type)}>
+                        {memory.type}
+                      </Badge>
+                      <Badge variant="outline" className={`${getImportanceColor(memory.importance)} border-current`}>
+                        {memory.importance}%
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 flex items-center">
+                        <Calendar className="w-3 h-3 mr-1" />
+                        {memory.timestamp.toLocaleDateString()}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => deleteMemory(memory.id)}
+                        className="text-red-400 border-red-400 hover:bg-red-400/10"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => deleteMemory(memory.id)}
-                    className="text-gray-400 hover:text-red-400 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
 
-              <div className="mb-3">
-                <p className="text-gray-200 leading-relaxed">{memory.content}</p>
-              </div>
+                  <p className="text-gray-200 mb-3">{memory.content}</p>
 
-              {memory.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {memory.tags.map((tag, index) => (
-                    <span 
-                      key={index}
-                      className="px-2 py-1 bg-gray-700/50 rounded text-xs text-gray-300"
-                    >
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
+                  {memory.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {memory.tags.map((tag, index) => (
+                        <Badge key={index} variant="outline" className="text-xs text-gray-400 border-gray-600">
+                          <Tag className="w-2 h-2 mr-1" />
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+
+                  {memory.associatedEmotions.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {memory.associatedEmotions.map((emotion, index) => (
+                        <span key={index} className="text-xs text-pink-300 bg-pink-900/20 px-2 py-1 rounded">
+                          {emotion}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              ))}
+
+              {filteredMemories.length === 0 && (
+                <Card className="bg-gray-800/50 border-gray-700/50 p-8 text-center">
+                  <Brain className="w-12 h-12 mx-auto mb-3 text-gray-600" />
+                  <p className="text-gray-400">
+                    {searchQuery || selectedType !== 'all' 
+                      ? 'Ничего не найдено по вашему запросу'
+                      : 'Пока нет воспоминаний. Анюта только начинает жить!'}
+                  </p>
+                </Card>
               )}
-
-              <div className="flex items-center justify-between text-sm text-gray-400">
-                <div className="flex items-center gap-4">
-                  {memory.emotion && (
-                    <span>Эмоция: {memory.emotion}</span>
-                  )}
-                  {memory.context && (
-                    <span>Контекст: {memory.context}</span>
-                  )}
-                </div>
-                {memory.associatedPeople.length > 0 && (
-                  <div>
-                    С: {memory.associatedPeople.join(', ')}
-                  </div>
-                )}
-              </div>
-            </Card>
-          ))}
+            </div>
+          </div>
         </div>
-
-        {filteredMemories.length === 0 && (
-          <Card className="bg-gray-800/50 border-gray-700/50 p-8 text-center">
-            <Brain className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-400 mb-2">Воспоминания не найдены</h3>
-            <p className="text-gray-500">
-              {searchTerm ? 'Попробуйте изменить поисковый запрос' : 'Новые воспоминания появятся по мере общения'}
-            </p>
-          </Card>
-        )}
       </div>
     </div>
   );
