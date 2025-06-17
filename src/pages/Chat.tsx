@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -284,7 +283,7 @@ const Chat = () => {
             {hasApiKey && (
               <AutonomousThinking 
                 currentMood={currentMood}
-                is Active={isAwake}
+                isActive={isAwake}
                 onNewThought={(thought) => console.log('Новая мысль:', thought)}
               />
             )}
