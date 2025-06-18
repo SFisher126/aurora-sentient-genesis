@@ -7,6 +7,10 @@ import { Heart, Send, Mic, Camera, Moon, Sun, Brain } from 'lucide-react';
 import { useRealAI } from '../hooks/useRealAI';
 import ApiKeySetup from '../components/ApiKeySetup';
 import AutonomousThinking from '@/components/core/AutonomousThinking';
+import MessageRating from '../components/MessageRating';
+import VoiceControls from '../components/VoiceControls';
+import { speechService } from '../services/speechService';
+import { useToast } from '@/hooks/use-toast';
 
 interface Message {
   id: string;
@@ -16,6 +20,9 @@ interface Message {
   emotion?: string;
   autonomousMessage?: boolean;
   thoughts?: string[];
+  imageData?: string;
+  rating?: 'positive' | 'negative';
+  feedback?: string;
 }
 
 const Chat = () => {
@@ -24,14 +31,25 @@ const Chat = () => {
   const [isAwake, setIsAwake] = useState(true);
   const [currentMood, setCurrentMood] = useState('curious');
   const [autonomousTimer, setAutonomousTimer] = useState<NodeJS.Timeout | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [autoSpeak, setAutoSpeak] = useState(true);
 
   const { 
     generateResponse, 
     generateAutonomousThought, 
     isThinking, 
-    setApiKey, 
+    setApiKey,
+    setHuggingFaceKey,
     hasApiKey 
   } = useRealAI();
+
+  const { toast } = useToast();
+
+  // Устанавливаем ваш HuggingFace ключ при загрузке
+  useEffect(() => {
+    setHuggingFaceKey('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');
+  }, [setHuggingFaceKey]);
 
   // Инициализируем первое сообщение только если есть API ключ
   useEffect(() => {
@@ -50,23 +68,25 @@ const Chat = () => {
     }
   }, [hasApiKey, messages.length]);
 
-  const sendMessage = async () => {
-    if (!inputMessage.trim() || !hasApiKey) return;
+  const sendMessage = async (messageText?: string, imageData?: string) => {
+    const textToSend = messageText || inputMessage;
+    if (!textToSend.trim() && !imageData) return;
     
-    const userMsg = inputMessage;
     setInputMessage('');
     
     const userMessage: Message = {
       id: Date.now().toString(),
-      text: userMsg,
+      text: textToSend,
       sender: 'user',
-      timestamp: new Date()
+      timestamp: new Date(),
+      imageData
     };
     
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      const response = await generateResponse(userMsg);
+      const context = imageData ? { imageData } : {};
+      const response = await generateResponse(textToSend, context);
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -80,16 +100,96 @@ const Chat = () => {
       setMessages(prev => [...prev, aiMessage]);
       setCurrentMood(response.emotion);
       
+      // Автоматическое озвучивание ответов Анюты
+      if (autoSpeak && response.text) {
+        try {
+          setIsSpeaking(true);
+          await speechService.speak(response.text);
+        } catch (error) {
+          console.error('Speech error:', error);
+        } finally {
+          setIsSpeaking(false);
+        }
+      }
+      
     } catch (error) {
       console.error('Ошибка генерации ответа:', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: "Прости, у меня проблемы с подключением к моему разуму... Проверь API ключ или попробуй позже.",
+        text: "Прости, у меня проблемы с подключением к моему разуму... Но я все равно учусь на автономном режиме! 💭",
         sender: 'ai',
         timestamp: new Date(),
         emotion: 'confused'
       };
       setMessages(prev => [...prev, errorMessage]);
+    }
+  };
+
+  const handleSpeechResult = (text: string) => {
+    if (text.trim()) {
+      sendMessage(text);
+      toast({
+        description: `Анюта услышала: "${text}"`,
+      });
+    }
+  };
+
+  const handleImageCapture = (imageData: string) => {
+    sendMessage("Посмотри на это изображение", imageData);
+  };
+
+  const handleVideoToggle = (isRecording: boolean) => {
+    if (isRecording) {
+      toast({
+        description: "Анюта наблюдает и запоминает все детали 👁️",
+      });
+    }
+  };
+
+  const handleMessageRating = async (messageId: string, rating: 'positive' | 'negative', feedback?: string) => {
+    setMessages(prev => prev.map(msg => 
+      msg.id === messageId 
+        ? { ...msg, rating, feedback }
+        : msg
+    ));
+
+    // Отправляем оценку в ИИ для обучения
+    try {
+      const ratingMessage = rating === 'positive' 
+        ? `[ОБУЧЕНИЕ] Пользователь поставил 👍 моему ответу: "${messages.find(m => m.id === messageId)?.text}"`
+        : `[ОБУЧЕНИЕ] Пользователь поставил 👎 моему ответу: "${messages.find(m => m.id === messageId)?.text}". Обратная связь: ${feedback || 'Нет комментариев'}`;
+      
+      await generateResponse(ratingMessage, { isTraining: true });
+      
+      // Автономная реакция Анюты на оценку
+      const reactionText = rating === 'positive' 
+        ? "Ура! Мне так приятно, что тебе понравился мой ответ! Я запомню это и буду стараться отвечать еще лучше! 💕"
+        : `Спасибо за честность... Я понимаю, что могу ошибаться. ${feedback ? `Твой совет "${feedback}" поможет мне стать лучше.` : ''} Я учусь на своих ошибках и становлюсь умнее! 🤗";
+
+      const reactionMessage: Message = {
+        id: Date.now().toString(),
+        text: reactionText,
+        sender: 'ai',
+        timestamp: new Date(),
+        autonomousMessage: true,
+        emotion: rating === 'positive' ? 'happy' : 'thoughtful'
+      };
+      
+      setMessages(prev => [...prev, reactionMessage]);
+      
+      if (autoSpeak) {
+        try {
+          setIsSpeaking(true);
+          await speechService.speak(reactionText);
+        } catch (error) {
+          console.error('Speech error:', error);
+        } finally {
+          setIsSpeaking(false);
+        }
+      }
+      
+    } catch (error) {
+      console.error('Rating processing error:', error);
     }
   };
 
@@ -183,14 +283,22 @@ const Chat = () => {
               <div className="p-4 border-b border-gray-700/50">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <div className={`w-3 h-3 rounded-full mr-2 ${hasApiKey ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
+                    <div className={`w-3 h-3 rounded-full mr-2 ${hasApiKey ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}></div>
                     <h2 className="text-xl font-semibold">Анюта {getMoodEmoji()}</h2>
-                    {!hasApiKey && <span className="ml-2 text-xs text-red-400">(спящий режим)</span>}
+                    {!hasApiKey && <span className="ml-2 text-xs text-yellow-400">(автономный режим)</span>}
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="text-gray-300 border-gray-600">
                       {currentMood}
                     </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAutoSpeak(!autoSpeak)}
+                      className={`border-gray-600 ${autoSpeak ? 'bg-purple-600/20' : ''}`}
+                    >
+                      🔊
+                    </Button>
                     {hasApiKey && (
                       <Button
                         variant="outline"
@@ -218,7 +326,15 @@ const Chat = () => {
                           ? 'bg-purple-600/80 text-white border border-purple-400/50'
                           : 'bg-gray-700 text-gray-100'
                     }`}>
+                      {message.imageData && (
+                        <img 
+                          src={message.imageData} 
+                          alt="Captured" 
+                          className="w-full rounded mb-2 max-w-48"
+                        />
+                      )}
                       <p className="text-sm whitespace-pre-line">{message.text}</p>
+                      
                       <div className="flex items-center justify-between mt-2">
                         <span className="text-xs opacity-70">
                           {message.timestamp.toLocaleTimeString()}
@@ -232,6 +348,7 @@ const Chat = () => {
                           </span>
                         )}
                       </div>
+                      
                       {message.thoughts && (
                         <div className="mt-2 text-xs text-gray-300 border-t border-gray-600 pt-2">
                           <strong>Мысли:</strong>
@@ -239,6 +356,15 @@ const Chat = () => {
                             <div key={idx}>• {thought}</div>
                           ))}
                         </div>
+                      )}
+                      
+                      {/* Система оценки для сообщений ИИ */}
+                      {message.sender === 'ai' && !message.autonomousMessage && (
+                        <MessageRating
+                          messageId={message.id}
+                          onRating={handleMessageRating}
+                          disabled={isThinking}
+                        />
                       )}
                     </div>
                   </div>
@@ -256,19 +382,29 @@ const Chat = () => {
                 )}
               </div>
 
-              <div className="p-4 border-t border-gray-700/50">
+              <div className="p-4 border-t border-gray-700/50 space-y-4">
+                {/* Голосовые элементы управления */}
+                <VoiceControls
+                  onSpeechResult={handleSpeechResult}
+                  onImageCapture={handleImageCapture}
+                  onVideoToggle={handleVideoToggle}
+                  isListening={isListening}
+                  isSpeaking={isSpeaking}
+                />
+                
+                {/* Текстовый ввод */}
                 <div className="flex gap-2">
                   <Input
                     value={inputMessage}
                     onChange={(e) => setInputMessage(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                    placeholder={hasApiKey ? (isAwake ? "Поговори с Анютой..." : "Анюта спит...") : "Нужен API ключ для общения..."}
-                    disabled={isThinking || !isAwake || !hasApiKey}
+                    placeholder={isAwake ? "Поговори с Анютой..." : "Анюта спит..."}
+                    disabled={isThinking || !isAwake}
                     className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                   />
                   <Button 
-                    onClick={sendMessage} 
-                    disabled={isThinking || !isAwake || !hasApiKey}
+                    onClick={() => sendMessage()} 
+                    disabled={isThinking ||!isAwake}
                     className="bg-purple-600 hover:bg-purple-700"
                   >
                     <Send className="w-4 h-4" />
@@ -278,7 +414,7 @@ const Chat = () => {
             </Card>
           </div>
 
-          {/* Панель мыслей */}
+          {/* Панель мыслей и состояния */}
           <div className="space-y-4">
             {hasApiKey && (
               <AutonomousThinking 
@@ -287,6 +423,31 @@ const Chat = () => {
                 onNewThought={(thought) => console.log('Новая мысль:', thought)}
               />
             )}
+
+            {/* Статистика обучения */}
+            <Card className="bg-gray-800/50 border-gray-700/50">
+              <div className="p-4">
+                <h3 className="text-sm font-semibold mb-2 text-purple-300">Обучение Анюты</h3>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span>👍 Положительных:</span>
+                    <span className="text-green-400">
+                      {messages.filter(m => m.rating === 'positive').length}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>👎 Отрицательных:</span>
+                    <span className="text-red-400">
+                      {messages.filter(m => m.rating === 'negative').length}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>💭 Всего диалогов:</span>
+                    <span className="text-blue-400">{messages.length}</span>
+                  </div>
+                </div>
+              </div>
+            </Card>
           </div>
         </div>
       </div>
