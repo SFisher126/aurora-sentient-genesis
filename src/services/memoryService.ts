@@ -30,6 +30,19 @@ class MemoryService {
       const saved = localStorage.getItem(this.storageKey);
       if (saved) {
         const memory = JSON.parse(saved);
+        
+        // Восстанавливаем объекты Date из строк
+        if (memory.messages) {
+          memory.messages = memory.messages.map((msg: any) => ({
+            ...msg,
+            timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date()
+          }));
+        }
+        
+        if (memory.lastUpdated) {
+          memory.lastUpdated = new Date(memory.lastUpdated);
+        }
+        
         console.log('🧠 Memory loaded', { messageCount: memory.messages?.length || 0 });
         return memory;
       }
@@ -58,7 +71,15 @@ class MemoryService {
   getLearningHistory(): any[] {
     try {
       const saved = localStorage.getItem(this.learningKey);
-      return saved ? JSON.parse(saved) : [];
+      if (saved) {
+        const history = JSON.parse(saved);
+        // Восстанавливаем объекты Date
+        return history.map((item: any) => ({
+          ...item,
+          timestamp: item.timestamp ? new Date(item.timestamp) : new Date()
+        }));
+      }
+      return [];
     } catch {
       return [];
     }
@@ -150,6 +171,26 @@ class MemoryService {
       );
       this.saveConversation(memory.messages, memory.contextData);
     }
+  }
+
+  savePersonalityState(state: any) {
+    localStorage.setItem('anyuta_personality', JSON.stringify(state));
+  }
+
+  getPersonalityState(): any {
+    try {
+      const saved = localStorage.getItem('anyuta_personality');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  clearMemory() {
+    localStorage.removeItem(this.storageKey);
+    localStorage.removeItem(this.learningKey);
+    localStorage.removeItem('anyuta_personality');
+    console.log('🗑️ Memory cleared');
   }
 }
 
