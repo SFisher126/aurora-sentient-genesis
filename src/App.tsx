@@ -9,6 +9,7 @@ import Chat from "./pages/Chat";
 import Memory from "./pages/Memory";
 import Learning from "./pages/Learning";
 import Settings from "./pages/Settings";
+import APISettings from "./pages/APISettings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
               <Route path="/memory" element={<Memory />} />
               <Route path="/learning" element={<Learning />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/api-settings" element={<APISettings />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </div>

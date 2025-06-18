@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { MessageCircle, Brain, BookOpen, Settings, Heart } from 'lucide-react';
+import { MessageCircle, Brain, BookOpen, Settings, Heart, Cpu } from 'lucide-react';
 
 const Navigation = () => {
   const location = useLocation();
@@ -11,6 +11,7 @@ const Navigation = () => {
     { path: '/memory', icon: Brain, label: 'Память' },
     { path: '/learning', icon: BookOpen, label: 'Обучение' },
     { path: '/settings', icon: Settings, label: 'Настройки' },
+    { path: '/api-settings', icon: Cpu, label: 'API' },
   ];
 
   return (
