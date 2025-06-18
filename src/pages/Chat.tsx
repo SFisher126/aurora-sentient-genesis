@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -86,8 +85,7 @@ const Chat = () => {
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      const context = imageData ? { imageData } : {};
-      const response = await generateResponse(textToSend, context);
+      const response = await generateResponse(textToSend);
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -160,7 +158,7 @@ const Chat = () => {
         ? `[ОБУЧЕНИЕ] Пользователь поставил 👍 моему ответу: "${messages.find(m => m.id === messageId)?.text}"`
         : `[ОБУЧЕНИЕ] Пользователь поставил 👎 моему ответу: "${messages.find(m => m.id === messageId)?.text}". Обратная связь: ${feedback || 'Нет комментариев'}`;
       
-      await generateResponse(ratingMessage, { isTraining: true });
+      await generateResponse(ratingMessage);
       
       // Автономная реакция Анюты на оценку
       const reactionText = rating === 'positive' 
