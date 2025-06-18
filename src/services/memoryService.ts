@@ -172,26 +172,6 @@ class MemoryService {
       this.saveConversation(memory.messages, memory.contextData);
     }
   }
-
-  savePersonalityState(state: any) {
-    localStorage.setItem('anyuta_personality', JSON.stringify(state));
-  }
-
-  getPersonalityState(): any {
-    try {
-      const saved = localStorage.getItem('anyuta_personality');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  }
-
-  clearMemory() {
-    localStorage.removeItem(this.storageKey);
-    localStorage.removeItem(this.learningKey);
-    localStorage.removeItem('anyuta_personality');
-    console.log('🗑️ Memory cleared');
-  }
 }
 
 export const memoryService = new MemoryService();
