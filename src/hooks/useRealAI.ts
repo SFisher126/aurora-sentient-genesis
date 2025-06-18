@@ -38,7 +38,7 @@ export const useRealAI = (): UseRealAIReturn => {
   const generateResponse = useCallback(async (message: string) => {
     setIsThinking(true);
     try {
-      const response = await aiService.generateResponse(message, {});
+      const response = await aiService.generateResponse(message);
       updateStates();
       return response;
     } finally {
