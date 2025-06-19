@@ -35,21 +35,21 @@ const AttachmentMenu: React.FC<AttachmentMenuProps> = ({
           <Video className="w-5 h-5" />
         </Button>
         
-        <label className="cursor-pointer">
-          <input
-            type="file"
-            onChange={onFileUpload}
-            className="hidden"
-            accept="*/*"
-          />
-          <Button
-            as="span"
-            className="bg-green-600 hover:bg-green-700 rounded-full w-12 h-12 p-0"
-            title="Файл"
-          >
+        <Button
+          asChild
+          className="bg-green-600 hover:bg-green-700 rounded-full w-12 h-12 p-0"
+          title="Файл"
+        >
+          <label className="cursor-pointer flex items-center justify-center">
+            <input
+              type="file"
+              onChange={onFileUpload}
+              className="hidden"
+              accept="*/*"
+            />
             <File className="w-5 h-5" />
-          </Button>
-        </label>
+          </label>
+        </Button>
       </div>
     </div>
   );
