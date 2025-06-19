@@ -3,13 +3,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Send, Mic, Camera, Paperclip, ArrowUp, Reply } from 'lucide-react';
+import { Send, Mic, Camera, Paperclip, File, Reply } from 'lucide-react';
 import { useRealAI } from '../hooks/useRealAI';
 import { enhancedSpeechService } from '../services/enhancedSpeechService';
 import { memoryService } from '../services/memoryService';
 import { useToast } from '@/hooks/use-toast';
 import FullscreenCamera from '../components/FullscreenCamera';
+import MessageRating from '../components/MessageRating';
+import VoiceButton from '../components/VoiceButton';
+import AttachmentMenu from '../components/AttachmentMenu';
 
 interface Message {
   id: string;
@@ -21,6 +23,7 @@ interface Message {
   thoughts?: string[];
   imageData?: string;
   videoData?: string;
+  fileData?: { name: string; content: string; type: string };
   rating?: 'positive' | 'negative';
   feedback?: string;
   connections?: any[];
@@ -31,23 +34,20 @@ const Chat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [currentMood, setCurrentMood] = useState('curious');
-  const [isListening, setIsListening] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [showAttachments, setShowAttachments] = useState(false);
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [cameraMode, setCameraMode] = useState<'photo' | 'video'>('photo');
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const [showAttachments, setShowAttachments] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const voiceButtonRef = useRef<HTMLButtonElement>(null);
+  const attachmentRef = useRef<HTMLDivElement>(null);
 
   const { 
     generateResponse, 
     isThinking, 
-    setApiKey,
     setHuggingFaceKey,
     hasApiKey 
   } = useRealAI();
@@ -88,9 +88,26 @@ const Chat = () => {
     }
   }, [messages, currentMood, isInitialized]);
 
-  const sendMessage = async (messageText?: string, imageData?: string, videoData?: string) => {
+  // Закрытие меню вложений при клике вне
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (attachmentRef.current && !attachmentRef.current.contains(event.target as Node)) {
+        setShowAttachments(false);
+      }
+    };
+
+    if (showAttachments) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showAttachments]);
+
+  const sendMessage = async (messageText?: string, imageData?: string, videoData?: string, fileData?: { name: string; content: string; type: string }) => {
     const textToSend = messageText || inputMessage;
-    if (!textToSend.trim() && !imageData && !videoData) return;
+    if (!textToSend.trim() && !imageData && !videoData && !fileData) return;
     
     setInputMessage('');
     setReplyToMessage(null);
@@ -102,13 +119,23 @@ const Chat = () => {
       timestamp: new Date(),
       imageData,
       videoData,
+      fileData,
       replyTo: replyToMessage?.id
     };
     
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      const response = await generateResponse(textToSend);
+      // Формируем контекст с учетом всей истории диалога
+      const conversationContext = messages.map(msg => 
+        `${msg.sender === 'user' ? 'Пользователь' : 'Анюта'}: ${msg.text}`
+      ).join('\n');
+      
+      const fullMessage = replyToMessage 
+        ? `Отвечаю на сообщение "${replyToMessage.text}": ${textToSend}\n\nКонтекст диалога:\n${conversationContext}`
+        : `${textToSend}\n\nКонтекст диалога:\n${conversationContext}`;
+
+      const response = await generateResponse(fullMessage);
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -122,6 +149,7 @@ const Chat = () => {
       setMessages(prev => [...prev, aiMessage]);
       setCurrentMood(response.emotion);
       
+      // Озвучиваем ответ
       if (response.text) {
         try {
           await enhancedSpeechService.speak(response.text);
@@ -143,31 +171,29 @@ const Chat = () => {
     }
   };
 
-  const handleVoiceStart = () => {
-    setIsListening(true);
-    setIsRecording(true);
-    
-    enhancedSpeechService.startListening(
-      (text) => {
-        if (text.trim()) {
-          sendMessage(text);
-          toast({ description: `Анюта услышала: "${text}"` });
-        }
-        setIsListening(false);
-        setIsRecording(false);
-      },
-      (error) => {
-        console.error('Voice error:', error);
-        setIsListening(false);
-        setIsRecording(false);
-      }
-    );
-  };
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-  const handleVoiceEnd = () => {
-    enhancedSpeechService.stopListening();
-    setIsListening(false);
-    setIsRecording(false);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      const fileData = {
+        name: file.name,
+        content: content,
+        type: file.type
+      };
+      
+      sendMessage(`Анюта, посмотри на этот файл: ${file.name}`, undefined, undefined, fileData);
+    };
+    
+    if (file.type.startsWith('text/') || file.name.endsWith('.json') || file.name.endsWith('.txt')) {
+      reader.readAsText(file);
+    } else {
+      reader.readAsDataURL(file);
+    }
+    
+    setShowAttachments(false);
   };
 
   const handleCameraCapture = (imageData: string) => {
@@ -182,7 +208,18 @@ const Chat = () => {
     setReplyToMessage(message);
   };
 
-  // Обработка свайпа
+  const handleMessageRating = (messageId: string, rating: 'positive' | 'negative', feedback?: string) => {
+    setMessages(prev => prev.map(msg => 
+      msg.id === messageId 
+        ? { ...msg, rating, feedback }
+        : msg
+    ));
+    
+    // Сохраняем оценку в память для обучения
+    memoryService.updateMessageConnection(messageId, { rating, feedback, timestamp: new Date() });
+  };
+
+  // Обработка свайпа для ответа
   const handleTouchStart = (e: React.TouchEvent, message: Message) => {
     if (message.sender === 'ai') {
       setTouchStart({
@@ -203,7 +240,6 @@ const Chat = () => {
     const deltaX = touchEnd.x - touchStart.x;
     const deltaY = Math.abs(touchEnd.y - touchStart.y);
 
-    // Свайп вправо для ответа (минимум 50px горизонтально, максимум 30px вертикально)
     if (deltaX > 50 && deltaY < 30) {
       handleReplyToMessage(message);
     }
@@ -235,7 +271,6 @@ const Chat = () => {
             src={message.imageData} 
             alt="Photo" 
             className="w-full rounded-lg mb-2 cursor-pointer"
-            onClick={() => {/* Открыть в полном размере */}}
           />
         )}
         
@@ -246,6 +281,13 @@ const Chat = () => {
             controls
           />
         )}
+
+        {message.fileData && (
+          <div className="bg-black/20 p-2 rounded mb-2">
+            <File className="w-4 h-4 inline mr-2" />
+            <span className="text-sm">{message.fileData.name}</span>
+          </div>
+        )}
         
         <p className="text-sm whitespace-pre-line">{message.text}</p>
         
@@ -253,13 +295,21 @@ const Chat = () => {
           <span className="text-xs opacity-70">
             {message.timestamp.toLocaleTimeString()}
           </span>
+          
+          {message.sender === 'ai' && (
+            <MessageRating
+              messageId={message.id}
+              onRating={handleMessageRating}
+              disabled={!!message.rating}
+            />
+          )}
         </div>
       </div>
     </div>
   );
 
   // Анимированное приветствие на разных языках
-  const greetings = ['Привет', 'Hello', 'Hola', '你好', 'Bonjour', 'Guten Tag', 'Ciao', 'こんにちは'];
+  const greetings = ['Привет', 'Hello', 'Hola', '你好', 'Bonjour', 'Guten Tag', 'Ciao', 'こんにちは', 'مرحبا', 'Namaste'];
   const [currentGreeting, setCurrentGreeting] = useState(0);
 
   useEffect(() => {
@@ -273,13 +323,13 @@ const Chat = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col">
-      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full">
+      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full relative">
         
-        <div className="flex-1 flex flex-col bg-gray-800 rounded-lg m-4">
+        <div className="flex-1 flex flex-col bg-gray-800 rounded-lg m-4 relative overflow-hidden">
           <div className="flex-1 p-4 overflow-y-auto" ref={chatContainerRef}>
             {messages.length === 0 ? (
               <div className="flex items-center justify-center h-full">
-                <div className="text-4xl font-light text-gray-400 animate-pulse">
+                <div className="text-4xl font-light text-gray-400 animate-pulse bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
                   {greetings[currentGreeting]}
                 </div>
               </div>
@@ -324,32 +374,17 @@ const Chat = () => {
             </div>
           )}
 
-          {showAttachments && (
-            <div className="px-4 py-2 bg-gray-700 flex gap-4">
-              <Button
-                onClick={() => {
-                  setCameraMode('photo');
-                  setIsCameraOpen(true);
-                  setShowAttachments(false);
-                }}
-                className="bg-purple-600 hover:bg-purple-700 rounded-full w-12 h-12"
-              >
-                <Camera className="w-5 h-5" />
-              </Button>
-              <Button
-                onClick={() => {
-                  setCameraMode('video');
-                  setIsCameraOpen(true);
-                  setShowAttachments(false);
-                }}
-                className="bg-red-600 hover:bg-red-700 rounded-full w-12 h-12"
-              >
-                📹
-              </Button>
-            </div>
-          )}
-
-          <div className="p-4 border-t border-gray-700">
+          <div className="p-4 border-t border-gray-700 relative" ref={attachmentRef}>
+            <AttachmentMenu 
+              isOpen={showAttachments}
+              onOpenCamera={(mode) => {
+                setCameraMode(mode);
+                setIsCameraOpen(true);
+                setShowAttachments(false);
+              }}
+              onFileUpload={handleFileUpload}
+            />
+            
             <div className="flex items-end gap-2">
               <Button
                 onClick={() => setShowAttachments(!showAttachments)}
@@ -379,18 +414,7 @@ const Chat = () => {
                   <Send className="w-5 h-5" />
                 </Button>
               ) : (
-                <Button
-                  ref={voiceButtonRef}
-                  onMouseDown={handleVoiceStart}
-                  onMouseUp={handleVoiceEnd}
-                  onTouchStart={handleVoiceStart}
-                  onTouchEnd={handleVoiceEnd}
-                  className={`rounded-full w-10 h-10 p-0 ${
-                    isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
-                  }`}
-                >
-                  <Mic className="w-5 h-5" />
-                </Button>
+                <VoiceButton onVoiceMessage={sendMessage} />
               )}
             </div>
           </div>
