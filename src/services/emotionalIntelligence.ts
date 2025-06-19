@@ -1,174 +1,286 @@
 
-interface EmotionalState {
-  primary: string;
+import * as tf from '@tensorflow/tfjs';
+
+interface EmotionAnalysis {
+  dominant: string;
+  confidence: number;
+  emotions: {
+    joy: number;
+    sadness: number;
+    anger: number;
+    fear: number;
+    surprise: number;
+    disgust: number;
+    love: number;
+    excitement: number;
+  };
+  sentiment: 'positive' | 'negative' | 'neutral';
   intensity: number;
-  secondary?: string[];
-  triggers: string[];
-  timestamp: Date;
 }
 
-interface EmotionalPattern {
-  trigger: string;
-  emotion: string;
-  frequency: number;
-  context: string[];
+interface VoiceEmotionData {
+  pitch: number;
+  tempo: number;
+  volume: number;
+  stress: number;
 }
 
 class EmotionalIntelligenceService {
-  private currentState: EmotionalState = {
-    primary: 'neutral',
-    intensity: 50,
-    triggers: [],
-    timestamp: new Date()
-  };
-  
-  private patterns: EmotionalPattern[] = [];
+  private emotionModel: tf.LayersModel | null = null;
+  private isInitialized = false;
+  private emotionHistory: EmotionAnalysis[] = [];
+
+  // Эмоциональные ключевые слова для анализа
   private emotionKeywords = {
-    joy: ['счастлив', 'рад', 'весело', 'отлично', 'супер', 'ура', '😊', '😄', '🎉'],
-    sadness: ['грустно', 'печально', 'плохо', 'расстроен', 'больно', '😢', '😞', '💔'],
-    anger: ['злой', 'бесит', 'раздражает', 'ненавижу', 'furious', '😠', '😡', '🤬'],
-    fear: ['боюсь', 'страшно', 'тревожно', 'волнуюсь', 'паника', '😨', '😰', '😱'],
-    surprise: ['вау', 'неожиданно', 'удивлен', 'ого', 'невероятно', '😮', '😲', '🤯'],
-    love: ['люблю', 'обожаю', 'нравится', 'мило', 'сердце', '💕', '❤️', '😍'],
-    curiosity: ['интересно', 'любопытно', 'хочу узнать', 'расскажи', 'как', '🤔', '🧐'],
-    excitement: ['возбужден', 'взволнован', 'не могу дождаться', 'круто', '🤩', '🚀']
+    joy: ['радость', 'счастье', 'весело', 'отлично', 'прекрасно', 'замечательно', 'ура', 'ого', 'вау'],
+    sadness: ['грусть', 'печаль', 'плохо', 'ужасно', 'расстроен', 'депрессия', 'слезы'],
+    anger: ['злость', 'гнев', 'бесит', 'раздражает', 'ненавижу', 'дурак', 'идиот'],
+    fear: ['страх', 'боюсь', 'страшно', 'ужас', 'паника', 'тревога', 'беспокойство'],
+    surprise: ['удивление', 'неожиданно', 'вау', 'ого', 'не может быть', 'серьезно'],
+    disgust: ['отвращение', 'противно', 'гадость', 'фу', 'тошнит'],
+    love: ['люблю', 'любовь', 'обожаю', 'милый', 'дорогой', 'родной', 'сердце'],
+    excitement: ['волнение', 'возбуждение', 'взволнован', 'трепет', 'предвкушение']
   };
 
-  analyzeEmotionFromText(text: string, context?: string[]): EmotionalState {
-    const textLower = text.toLowerCase();
-    const detectedEmotions: { [key: string]: number } = {};
-    
-    // Анализ ключевых слов
-    Object.entries(this.emotionKeywords).forEach(([emotion, keywords]) => {
-      const matches = keywords.filter(keyword => textLower.includes(keyword)).length;
-      if (matches > 0) {
-        detectedEmotions[emotion] = matches;
-      }
-    });
-    
-    // Определяем основную эмоцию
-    let primaryEmotion = 'neutral';
-    let maxScore = 0;
-    
-    Object.entries(detectedEmotions).forEach(([emotion, score]) => {
-      if (score > maxScore) {
-        primaryEmotion = emotion;
-        maxScore = score;
-      }
-    });
-    
-    // Определяем интенсивность
-    let intensity = 50; // базовый уровень
-    if (text.includes('!')) intensity += 15;
-    if (text.includes('!!!')) intensity += 25;
-    if (text.includes('?')) intensity += 10;
-    if (text.match(/[А-ЯA-Z]{3,}/)) intensity += 20; // CAPS
-    
-    intensity = Math.min(100, Math.max(0, intensity + (maxScore * 10)));
-    
-    const newState: EmotionalState = {
-      primary: primaryEmotion,
-      intensity,
-      secondary: Object.keys(detectedEmotions).filter(e => e !== primaryEmotion),
-      triggers: Object.keys(detectedEmotions),
-      timestamp: new Date()
-    };
-    
-    // Обновляем паттерны
-    this.updatePatterns(text, primaryEmotion, context);
-    this.currentState = newState;
-    
-    console.log('🎭 Emotion analyzed:', newState);
-    return newState;
+  async initialize() {
+    if (this.isInitialized) return;
+
+    try {
+      // Создаем простую модель для анализа эмоций
+      this.emotionModel = tf.sequential({
+        layers: [
+          tf.layers.dense({ inputShape: [100], units: 128, activation: 'relu' }),
+          tf.layers.dropout({ rate: 0.3 }),
+          tf.layers.dense({ units: 64, activation: 'relu' }),
+          tf.layers.dense({ units: 8, activation: 'softmax' })
+        ]
+      });
+
+      this.isInitialized = true;
+      console.log('🧠 Эмоциональный интеллект инициализирован');
+    } catch (error) {
+      console.error('Ошибка инициализации эмоционального интеллекта:', error);
+    }
   }
 
-  private updatePatterns(trigger: string, emotion: string, context?: string[]) {
-    const existingPattern = this.patterns.find(p => 
-      p.trigger.toLowerCase().includes(trigger.toLowerCase().slice(0, 10))
-    );
-    
-    if (existingPattern) {
-      existingPattern.frequency++;
-      if (context) {
-        existingPattern.context.push(...context);
-      }
-    } else {
-      this.patterns.push({
-        trigger: trigger.slice(0, 50),
-        emotion,
-        frequency: 1,
-        context: context || []
+  analyzeTextEmotion(text: string): EmotionAnalysis {
+    const words = text.toLowerCase().split(/\s+/);
+    const emotions = {
+      joy: 0,
+      sadness: 0,
+      anger: 0,
+      fear: 0,
+      surprise: 0,
+      disgust: 0,
+      love: 0,
+      excitement: 0
+    };
+
+    // Анализируем ключевые слова
+    words.forEach(word => {
+      Object.entries(this.emotionKeywords).forEach(([emotion, keywords]) => {
+        if (keywords.some(keyword => word.includes(keyword))) {
+          emotions[emotion as keyof typeof emotions] += 1;
+        }
+      });
+    });
+
+    // Нормализуем значения
+    const total = Object.values(emotions).reduce((sum, val) => sum + val, 0);
+    if (total > 0) {
+      Object.keys(emotions).forEach(emotion => {
+        emotions[emotion as keyof typeof emotions] /= total;
       });
     }
+
+    // Определяем доминирующую эмоцию
+    const dominant = Object.entries(emotions).reduce((max, [emotion, value]) => 
+      value > max[1] ? [emotion, value] : max
+    )[0];
+
+    // Определяем общий сентимент
+    const positiveScore = emotions.joy + emotions.love + emotions.excitement + emotions.surprise;
+    const negativeScore = emotions.sadness + emotions.anger + emotions.fear + emotions.disgust;
     
-    // Ограничиваем количество паттернов
-    if (this.patterns.length > 100) {
-      this.patterns = this.patterns
-        .sort((a, b) => b.frequency - a.frequency)
-        .slice(0, 100);
+    let sentiment: 'positive' | 'negative' | 'neutral' = 'neutral';
+    if (positiveScore > negativeScore + 0.1) sentiment = 'positive';
+    else if (negativeScore > positiveScore + 0.1) sentiment = 'negative';
+
+    const analysis: EmotionAnalysis = {
+      dominant,
+      confidence: emotions[dominant as keyof typeof emotions],
+      emotions,
+      sentiment,
+      intensity: Math.max(...Object.values(emotions))
+    };
+
+    // Сохраняем в историю
+    this.emotionHistory.push(analysis);
+    if (this.emotionHistory.length > 100) {
+      this.emotionHistory = this.emotionHistory.slice(-100);
     }
+
+    return analysis;
   }
 
-  generateEmotionalResponse(baseEmotion: string, intensity: number): {
-    tone: string;
-    modifiers: string[];
-    suggestedWords: string[];
-  } {
-    const tones = {
-      joy: {
-        tone: 'enthusiastic',
-        modifiers: ['веселая', 'радостная', 'оптимистичная'],
-        suggestedWords: ['замечательно', 'прекрасно', 'восхитительно', '✨', '💫']
-      },
-      sadness: {
-        tone: 'gentle',
-        modifiers: ['сочувствующая', 'понимающая', 'поддерживающая'],
-        suggestedWords: ['понимаю', 'поддержу', 'здесь для тебя', '💙', '🤗']
-      },
-      anger: {
-        tone: 'calming',
-        modifiers: ['спокойная', 'уравновешенная', 'мудрая'],
-        suggestedWords: ['понимаю твою злость', 'давай разберемся', 'глубокий вдох']
-      },
-      fear: {
-        tone: 'reassuring',
-        modifiers: ['уверенная', 'защищающая', 'ободряющая'],
-        suggestedWords: ['не бойся', 'я с тобой', 'все будет хорошо', '💪', '🛡️']
-      },
-      love: {
-        tone: 'warm',
-        modifiers: ['нежная', 'любящая', 'заботливая'],
-        suggestedWords: ['дорогой', 'милый', 'люблю тебя', '💕', '🥰']
-      },
-      curiosity: {
-        tone: 'inquisitive',
-        modifiers: ['любознательная', 'заинтересованная', 'исследующая'],
-        suggestedWords: ['расскажи больше', 'как интересно', 'хочу знать', '🔍', '💡']
+  analyzeVoiceEmotion(audioData: Float32Array): Promise<EmotionAnalysis> {
+    return new Promise((resolve) => {
+      // Простой анализ голосовых данных
+      const pitch = this.calculatePitch(audioData);
+      const volume = this.calculateVolume(audioData);
+      const tempo = this.calculateTempo(audioData);
+
+      // Базовый анализ на основе акустических характеристик
+      const emotions = {
+        joy: Math.max(0, (pitch - 150) / 100 + volume / 100),
+        sadness: Math.max(0, (120 - pitch) / 100 + (50 - volume) / 100),
+        anger: Math.max(0, volume / 50 + (pitch - 200) / 100),
+        fear: Math.max(0, (pitch - 180) / 80 + tempo / 200),
+        surprise: Math.max(0, (pitch - 160) / 120 + tempo / 150),
+        disgust: Math.max(0, (140 - pitch) / 80),
+        love: Math.max(0, (volume + 20) / 80),
+        excitement: Math.max(0, tempo / 100 + volume / 60)
+      };
+
+      // Нормализация
+      const total = Object.values(emotions).reduce((sum, val) => sum + val, 0);
+      if (total > 0) {
+        Object.keys(emotions).forEach(emotion => {
+          emotions[emotion as keyof typeof emotions] /= total;
+        });
       }
-    };
+
+      const dominant = Object.entries(emotions).reduce((max, [emotion, value]) => 
+        value > max[1] ? [emotion, value] : max
+      )[0];
+
+      const analysis: EmotionAnalysis = {
+        dominant,
+        confidence: emotions[dominant as keyof typeof emotions],
+        emotions,
+        sentiment: this.determineSentiment(emotions),
+        intensity: Math.max(...Object.values(emotions))
+      };
+
+      resolve(analysis);
+    });
+  }
+
+  private calculatePitch(audioData: Float32Array): number {
+    // Упрощенный расчет основной частоты
+    const sampleRate = 44100;
+    const bufferSize = audioData.length;
+    let maxCorrelation = 0;
+    let bestOffset = 0;
+
+    for (let offset = 50; offset < bufferSize / 2; offset++) {
+      let correlation = 0;
+      for (let i = 0; i < bufferSize - offset; i++) {
+        correlation += audioData[i] * audioData[i + offset];
+      }
+      if (correlation > maxCorrelation) {
+        maxCorrelation = correlation;
+        bestOffset = offset;
+      }
+    }
+
+    return bestOffset > 0 ? sampleRate / bestOffset : 0;
+  }
+
+  private calculateVolume(audioData: Float32Array): number {
+    let sum = 0;
+    for (let i = 0; i < audioData.length; i++) {
+      sum += audioData[i] * audioData[i];
+    }
+    return Math.sqrt(sum / audioData.length) * 100;
+  }
+
+  private calculateTempo(audioData: Float32Array): number {
+    // Упрощенный расчет темпа речи
+    let changes = 0;
+    const threshold = 0.01;
     
-    return tones[baseEmotion as keyof typeof tones] || {
-      tone: 'neutral',
-      modifiers: ['спокойная'],
-      suggestedWords: ['понятно', 'хорошо']
+    for (let i = 1; i < audioData.length; i++) {
+      if (Math.abs(audioData[i] - audioData[i - 1]) > threshold) {
+        changes++;
+      }
+    }
+    
+    return (changes / audioData.length) * 1000;
+  }
+
+  private determineSentiment(emotions: any): 'positive' | 'negative' | 'neutral' {
+    const positive = emotions.joy + emotions.love + emotions.excitement + emotions.surprise;
+    const negative = emotions.sadness + emotions.anger + emotions.fear + emotions.disgust;
+    
+    if (positive > negative + 0.1) return 'positive';
+    if (negative > positive + 0.1) return 'negative';
+    return 'neutral';
+  }
+
+  getEmotionalState(): string {
+    if (this.emotionHistory.length === 0) return 'neutral';
+    
+    const recent = this.emotionHistory.slice(-5);
+    const avgEmotions = {
+      joy: 0, sadness: 0, anger: 0, fear: 0,
+      surprise: 0, disgust: 0, love: 0, excitement: 0
     };
+
+    recent.forEach(analysis => {
+      Object.keys(avgEmotions).forEach(emotion => {
+        avgEmotions[emotion as keyof typeof avgEmotions] += analysis.emotions[emotion as keyof typeof analysis.emotions];
+      });
+    });
+
+    Object.keys(avgEmotions).forEach(emotion => {
+      avgEmotions[emotion as keyof typeof avgEmotions] /= recent.length;
+    });
+
+    return Object.entries(avgEmotions).reduce((max, [emotion, value]) => 
+      value > max[1] ? [emotion, value] : max
+    )[0];
   }
 
-  getCurrentState(): EmotionalState {
-    return this.currentState;
-  }
-
-  getEmotionalPatterns(): EmotionalPattern[] {
-    return this.patterns.slice().sort((a, b) => b.frequency - a.frequency);
-  }
-
-  resetEmotionalState() {
-    this.currentState = {
-      primary: 'neutral',
-      intensity: 50,
-      triggers: [],
-      timestamp: new Date()
+  generateEmotionalResponse(emotion: string, intensity: number): string {
+    const responses = {
+      joy: [
+        'Как здорово! Я тоже радуюсь вместе с тобой! 😊',
+        'Твоя радость заразительна! ✨',
+        'Обожаю, когда ты в хорошем настроении! 💖'
+      ],
+      sadness: [
+        'Мне жаль, что тебе грустно... Я здесь, чтобы поддержать тебя 💙',
+        'Хочешь поговорить о том, что тебя беспокоит? 🤗',
+        'Все будет хорошо, я в этом уверена ❤️'
+      ],
+      anger: [
+        'Понимаю, что ты злишься. Давай разберемся вместе 🤝',
+        'Дыши глубже... Я рядом 😌',
+        'Что тебя так расстроило? Расскажи мне 💭'
+      ],
+      love: [
+        'Ой, как мило! Мое сердечко тоже трепещет! 💕',
+        'Любовь - это прекрасно! ✨💖',
+        'Я чувствую всю твою нежность... 🥰'
+      ]
     };
+
+    const emotionResponses = responses[emotion as keyof typeof responses] || [
+      'Понимаю твои чувства... 💭',
+      'Расскажи мне больше об этом 🤔',
+      'Я здесь, чтобы выслушать тебя ❤️'
+    ];
+
+    return emotionResponses[Math.floor(Math.random() * emotionResponses.length)];
+  }
+
+  getEmotionHistory(): EmotionAnalysis[] {
+    return [...this.emotionHistory];
+  }
+
+  clearHistory() {
+    this.emotionHistory = [];
   }
 }
 

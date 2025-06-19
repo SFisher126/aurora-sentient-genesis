@@ -5,7 +5,7 @@ interface User {
   phone?: string;
   name: string;
   avatar?: string;
-  provider: 'google' | 'yandex' | 'phone' | 'guest';
+  provider: 'google' | 'yandex' | 'phone';
   createdAt: Date;
   lastLogin: Date;
 }
@@ -53,52 +53,175 @@ class AuthService {
   }
 
   async loginWithGoogle(): Promise<User> {
-    // Эмуляция Google OAuth (в реальном проекте использовать Google OAuth)
-    const mockUser: User = {
-      id: 'google_' + Date.now(),
-      email: 'user@gmail.com',
-      name: 'Google User',
-      provider: 'google',
-      createdAt: new Date(),
-      lastLogin: new Date()
-    };
-    
-    this.saveUser(mockUser);
-    console.log('🔑 Google login successful');
-    return mockUser;
+    return new Promise((resolve, reject) => {
+      // Создаем окно для Google OAuth
+      const googleOAuthURL = `https://accounts.google.com/oauth/authorize?` +
+        `client_id=YOUR_GOOGLE_CLIENT_ID&` +
+        `redirect_uri=${encodeURIComponent(window.location.origin)}&` +
+        `response_type=token&` +
+        `scope=email profile`;
+
+      const popup = window.open(
+        googleOAuthURL,
+        'google-login',
+        'width=500,height=600,scrollbars=yes,resizable=yes'
+      );
+
+      const checkClosed = setInterval(() => {
+        if (popup?.closed) {
+          clearInterval(checkClosed);
+          reject(new Error('Вход отменен пользователем'));
+        }
+      }, 1000);
+
+      // Слушаем сообщения от окна OAuth
+      const messageListener = (event: MessageEvent) => {
+        if (event.origin !== window.location.origin) return;
+        
+        if (event.data.type === 'GOOGLE_AUTH_SUCCESS') {
+          clearInterval(checkClosed);
+          popup?.close();
+          window.removeEventListener('message', messageListener);
+          
+          const user: User = {
+            id: 'google_' + event.data.user.id,
+            email: event.data.user.email,
+            name: event.data.user.name,
+            avatar: event.data.user.picture,
+            provider: 'google',
+            createdAt: new Date(),
+            lastLogin: new Date()
+          };
+          
+          this.saveUser(user);
+          console.log('🔑 Google login successful');
+          resolve(user);
+        } else if (event.data.type === 'GOOGLE_AUTH_ERROR') {
+          clearInterval(checkClosed);
+          popup?.close();
+          window.removeEventListener('message', messageListener);
+          reject(new Error(event.data.error));
+        }
+      };
+
+      window.addEventListener('message', messageListener);
+
+      // Для демонстрации - эмулируем успешный вход через 2 секунды
+      // В реальном проекте это будет обрабатываться через redirect_uri
+      setTimeout(() => {
+        clearInterval(checkClosed);
+        popup?.close();
+        window.removeEventListener('message', messageListener);
+        
+        const mockUser: User = {
+          id: 'google_' + Date.now(),
+          email: 'user@gmail.com',
+          name: 'Google User',
+          avatar: `https://ui-avatars.com/api/?name=Google+User&background=4285f4&color=fff`,
+          provider: 'google',
+          createdAt: new Date(),
+          lastLogin: new Date()
+        };
+        
+        this.saveUser(mockUser);
+        console.log('🔑 Google login successful');
+        resolve(mockUser);
+      }, 2000);
+    });
   }
 
   async loginWithYandex(): Promise<User> {
-    // Эмуляция Yandex OAuth
-    const mockUser: User = {
-      id: 'yandex_' + Date.now(),
-      email: 'user@yandex.ru',
-      name: 'Yandex User',
-      provider: 'yandex',
-      createdAt: new Date(),
-      lastLogin: new Date()
-    };
-    
-    this.saveUser(mockUser);
-    console.log('🔑 Yandex login successful');
-    return mockUser;
+    return new Promise((resolve, reject) => {
+      // Создаем окно для Yandex OAuth
+      const yandexOAuthURL = `https://oauth.yandex.ru/authorize?` +
+        `response_type=token&` +
+        `client_id=YOUR_YANDEX_CLIENT_ID&` +
+        `redirect_uri=${encodeURIComponent(window.location.origin)}`;
+
+      const popup = window.open(
+        yandexOAuthURL,
+        'yandex-login',
+        'width=500,height=600,scrollbars=yes,resizable=yes'
+      );
+
+      const checkClosed = setInterval(() => {
+        if (popup?.closed) {
+          clearInterval(checkClosed);
+          reject(new Error('Вход отменен пользователем'));
+        }
+      }, 1000);
+
+      // Слушаем сообщения от окна OAuth
+      const messageListener = (event: MessageEvent) => {
+        if (event.origin !== window.location.origin) return;
+        
+        if (event.data.type === 'YANDEX_AUTH_SUCCESS') {
+          clearInterval(checkClosed);
+          popup?.close();
+          window.removeEventListener('message', messageListener);
+          
+          const user: User = {
+            id: 'yandex_' + event.data.user.id,
+            email: event.data.user.default_email,
+            name: event.data.user.display_name,
+            avatar: `https://avatars.yandex.net/get-yapic/${event.data.user.default_avatar_id}/islands-200`,
+            provider: 'yandex',
+            createdAt: new Date(),
+            lastLogin: new Date()
+          };
+          
+          this.saveUser(user);
+          console.log('🔑 Yandex login successful');
+          resolve(user);
+        } else if (event.data.type === 'YANDEX_AUTH_ERROR') {
+          clearInterval(checkClosed);
+          popup?.close();
+          window.removeEventListener('message', messageListener);
+          reject(new Error(event.data.error));
+        }
+      };
+
+      window.addEventListener('message', messageListener);
+
+      // Для демонстрации - эмулируем успешный вход через 2 секунды
+      // В реальном проекте это будет обрабатываться через redirect_uri
+      setTimeout(() => {
+        clearInterval(checkClosed);
+        popup?.close();
+        window.removeEventListener('message', messageListener);
+        
+        const mockUser: User = {
+          id: 'yandex_' + Date.now(),
+          email: 'user@yandex.ru',
+          name: 'Yandex User',
+          avatar: `https://ui-avatars.com/api/?name=Yandex+User&background=ff0000&color=fff`,
+          provider: 'yandex',
+          createdAt: new Date(),
+          lastLogin: new Date()
+        };
+        
+        this.saveUser(mockUser);
+        console.log('🔑 Yandex login successful');
+        resolve(mockUser);
+      }, 2000);
+    });
   }
 
   async loginWithPhone(phone: string, code: string): Promise<User> {
     // Эмуляция SMS аутентификации
     if (code === '1234') {
-      const mockUser: User = {
+      const user: User = {
         id: 'phone_' + Date.now(),
         phone: phone,
-        name: 'Phone User',
+        name: `Пользователь ${phone.slice(-4)}`,
         provider: 'phone',
         createdAt: new Date(),
         lastLogin: new Date()
       };
       
-      this.saveUser(mockUser);
+      this.saveUser(user);
       console.log('🔑 Phone login successful');
-      return mockUser;
+      return user;
     } else {
       throw new Error('Неверный код подтверждения');
     }
@@ -108,20 +231,6 @@ class AuthService {
     // Эмуляция отправки SMS
     console.log('📱 SMS код отправлен на:', phone);
     return true;
-  }
-
-  loginAsGuest(): User {
-    const guestUser: User = {
-      id: 'guest_' + Date.now(),
-      name: 'Гость',
-      provider: 'guest',
-      createdAt: new Date(),
-      lastLogin: new Date()
-    };
-    
-    this.saveUser(guestUser);
-    console.log('🔑 Guest login successful');
-    return guestUser;
   }
 
   logout() {
