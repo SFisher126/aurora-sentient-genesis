@@ -4,11 +4,12 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Send, Mic, Camera, Paperclip, ArrowUp } from 'lucide-react';
+import { Send, Mic, Camera, Paperclip, ArrowUp, Reply } from 'lucide-react';
 import { useRealAI } from '../hooks/useRealAI';
 import { enhancedSpeechService } from '../services/enhancedSpeechService';
 import { memoryService } from '../services/memoryService';
 import { useToast } from '@/hooks/use-toast';
+import FullscreenCamera from '../components/FullscreenCamera';
 
 interface Message {
   id: string;
@@ -35,6 +36,9 @@ const Chat = () => {
   const [showAttachments, setShowAttachments] = useState(false);
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [cameraMode, setCameraMode] = useState<'photo' | 'video'>('photo');
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -65,7 +69,6 @@ const Chat = () => {
     
     setHuggingFaceKey('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');
     
-    // Загружаем сохраненную память без приветственного сообщения
     const savedMemory = memoryService.loadConversation();
     if (savedMemory && savedMemory.messages && savedMemory.messages.length > 0) {
       setMessages(savedMemory.messages);
@@ -119,7 +122,6 @@ const Chat = () => {
       setMessages(prev => [...prev, aiMessage]);
       setCurrentMood(response.emotion);
       
-      // Автоматическое озвучивание ответов Анюты
       if (response.text) {
         try {
           await enhancedSpeechService.speak(response.text);
@@ -141,7 +143,6 @@ const Chat = () => {
     }
   };
 
-  // Голосовое сообщение как в Telegram
   const handleVoiceStart = () => {
     setIsListening(true);
     setIsRecording(true);
@@ -169,41 +170,62 @@ const Chat = () => {
     setIsRecording(false);
   };
 
-  const handleImageCapture = () => {
-    // Открываем камеру для фото
-    navigator.mediaDevices.getUserMedia({ video: true })
-      .then(stream => {
-        // Создаем элемент видео для предпросмотра
-        const video = document.createElement('video');
-        video.srcObject = stream;
-        video.play();
-        
-        // Здесь будет логика камеры
-        toast({ description: "Камера активирована 📸" });
-      })
-      .catch(error => {
-        console.error('Camera error:', error);
-        toast({ description: "Ошибка доступа к камере", variant: "destructive" });
-      });
+  const handleCameraCapture = (imageData: string) => {
+    sendMessage('Анюта, посмотри на это фото', imageData);
+  };
+
+  const handleVideoCapture = (videoData: string) => {
+    sendMessage('Анюта, посмотри на это видео', undefined, videoData);
   };
 
   const handleReplyToMessage = (message: Message) => {
     setReplyToMessage(message);
   };
 
+  // Обработка свайпа
+  const handleTouchStart = (e: React.TouchEvent, message: Message) => {
+    if (message.sender === 'ai') {
+      setTouchStart({
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY
+      });
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent, message: Message) => {
+    if (!touchStart || message.sender !== 'ai') return;
+
+    const touchEnd = {
+      x: e.changedTouches[0].clientX,
+      y: e.changedTouches[0].clientY
+    };
+
+    const deltaX = touchEnd.x - touchStart.x;
+    const deltaY = Math.abs(touchEnd.y - touchStart.y);
+
+    // Свайп вправо для ответа (минимум 50px горизонтально, максимум 30px вертикально)
+    if (deltaX > 50 && deltaY < 30) {
+      handleReplyToMessage(message);
+    }
+
+    setTouchStart(null);
+  };
+
   const renderMessage = (message: Message) => (
     <div 
       key={message.id}
       className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
-      onSwipeRight={message.sender === 'ai' ? () => handleReplyToMessage(message) : undefined}
+      onTouchStart={(e) => handleTouchStart(e, message)}
+      onTouchEnd={(e) => handleTouchEnd(e, message)}
     >
-      <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${
+      <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl relative ${
         message.sender === 'user' 
           ? 'bg-blue-600 text-white rounded-br-md' 
           : 'bg-gray-700 text-gray-100 rounded-bl-md'
       }`}>
         {message.replyTo && (
           <div className="text-xs opacity-70 mb-2 p-2 bg-black/20 rounded">
+            <Reply className="w-3 h-3 inline mr-1" />
             Ответ на: {messages.find(m => m.id === message.replyTo)?.text?.slice(0, 50)}...
           </div>
         )}
@@ -253,7 +275,6 @@ const Chat = () => {
     <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col">
       <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full">
         
-        {/* Чат */}
         <div className="flex-1 flex flex-col bg-gray-800 rounded-lg m-4">
           <div className="flex-1 p-4 overflow-y-auto" ref={chatContainerRef}>
             {messages.length === 0 ? (
@@ -284,11 +305,11 @@ const Chat = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Ответ на сообщение */}
           {replyToMessage && (
             <div className="px-4 py-2 bg-gray-700 border-l-4 border-blue-500">
               <div className="flex justify-between items-center">
                 <div className="text-sm text-gray-300">
+                  <Reply className="w-3 h-3 inline mr-1" />
                   Ответ на: {replyToMessage.text.slice(0, 50)}...
                 </div>
                 <Button
@@ -303,17 +324,24 @@ const Chat = () => {
             </div>
           )}
 
-          {/* Панель вложений */}
           {showAttachments && (
             <div className="px-4 py-2 bg-gray-700 flex gap-4">
               <Button
-                onClick={handleImageCapture}
+                onClick={() => {
+                  setCameraMode('photo');
+                  setIsCameraOpen(true);
+                  setShowAttachments(false);
+                }}
                 className="bg-purple-600 hover:bg-purple-700 rounded-full w-12 h-12"
               >
                 <Camera className="w-5 h-5" />
               </Button>
               <Button
-                onClick={() => {/* Видео */}}
+                onClick={() => {
+                  setCameraMode('video');
+                  setIsCameraOpen(true);
+                  setShowAttachments(false);
+                }}
                 className="bg-red-600 hover:bg-red-700 rounded-full w-12 h-12"
               >
                 📹
@@ -321,7 +349,6 @@ const Chat = () => {
             </div>
           )}
 
-          {/* Ввод сообщения */}
           <div className="p-4 border-t border-gray-700">
             <div className="flex items-end gap-2">
               <Button
@@ -369,6 +396,13 @@ const Chat = () => {
           </div>
         </div>
       </div>
+
+      <FullscreenCamera
+        isOpen={isCameraOpen}
+        onClose={() => setIsCameraOpen(false)}
+        onCapture={cameraMode === 'photo' ? handleCameraCapture : handleVideoCapture}
+        mode={cameraMode}
+      />
     </div>
   );
 };
