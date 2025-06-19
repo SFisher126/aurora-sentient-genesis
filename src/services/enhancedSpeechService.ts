@@ -19,6 +19,7 @@ class EnhancedSpeechService {
   };
   private isSpeaking: boolean = false;
   private isListening: boolean = false;
+  private recognitionStarted: boolean = false;
 
   constructor() {
     this.synthesis = window.speechSynthesis;
@@ -138,63 +139,85 @@ class EnhancedSpeechService {
         return;
       }
 
-      if (this.isListening) {
-        console.log('Already listening...');
-        resolve();
+      // Исправление: проверяем состояние перед запуском
+      if (this.isListening || this.recognitionStarted) {
+        console.log('Recognition already running, stopping first...');
+        this.stopListening();
+        // Даем время на завершение
+        setTimeout(() => {
+          this.startListeningInternal(onResult, onError, resolve, reject);
+        }, 100);
         return;
       }
 
-      this.recognition.onstart = () => {
-        this.isListening = true;
-        console.log('🎙️ Started listening...');
-        resolve();
-      };
-
-      this.recognition.onresult = (event: any) => {
-        let finalTranscript = '';
-        let interimTranscript = '';
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript;
-          } else {
-            interimTranscript += transcript;
-          }
-        }
-
-        if (finalTranscript) {
-          console.log('🎤 User said:', finalTranscript);
-          onResult(finalTranscript);
-        }
-      };
-
-      this.recognition.onerror = (event: any) => {
-        console.error('Speech recognition error:', event.error);
-        this.isListening = false;
-        onError?.(event.error);
-      };
-
-      this.recognition.onend = () => {
-        this.isListening = false;
-        console.log('🔇 Stopped listening');
-      };
-
-      try {
-        this.recognition.start();
-      } catch (error) {
-        console.error('Failed to start recognition:', error);
-        this.isListening = false;
-        onError?.(error);
-        reject(error);
-      }
+      this.startListeningInternal(onResult, onError, resolve, reject);
     });
   }
 
-  stopListening() {
-    if (this.recognition && this.isListening) {
-      this.recognition.stop();
+  private startListeningInternal(onResult: (text: string) => void, onError?: (error: any) => void, resolve?: () => void, reject?: (error: any) => void) {
+    this.recognition.onstart = () => {
+      this.isListening = true;
+      this.recognitionStarted = true;
+      console.log('🎙️ Started listening...');
+      resolve?.();
+    };
+
+    this.recognition.onresult = (event: any) => {
+      let finalTranscript = '';
+      let interimTranscript = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+
+      if (finalTranscript) {
+        console.log('🎤 User said:', finalTranscript);
+        onResult(finalTranscript);
+      }
+    };
+
+    this.recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
       this.isListening = false;
+      this.recognitionStarted = false;
+      
+      // Игнорируем ошибку "already started"
+      if (event.error !== 'already-started') {
+        onError?.(event.error);
+      }
+    };
+
+    this.recognition.onend = () => {
+      this.isListening = false;
+      this.recognitionStarted = false;
+      console.log('🔇 Stopped listening');
+    };
+
+    try {
+      this.recognition.start();
+    } catch (error) {
+      console.error('Failed to start recognition:', error);
+      this.isListening = false;
+      this.recognitionStarted = false;
+      onError?.(error);
+      reject?.(error);
+    }
+  }
+
+  stopListening() {
+    if (this.recognition && (this.isListening || this.recognitionStarted)) {
+      try {
+        this.recognition.stop();
+      } catch (error) {
+        console.error('Error stopping recognition:', error);
+      }
+      this.isListening = false;
+      this.recognitionStarted = false;
       console.log('🔇 Manually stopped listening');
     }
   }

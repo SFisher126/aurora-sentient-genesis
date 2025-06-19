@@ -1,17 +1,18 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send, Mic, Camera, Paperclip, File, Reply } from 'lucide-react';
+import { Send, Paperclip, Reply, User, LogOut } from 'lucide-react';
 import { useRealAI } from '../hooks/useRealAI';
 import { enhancedSpeechService } from '../services/enhancedSpeechService';
 import { memoryService } from '../services/memoryService';
+import { authService } from '../services/authService';
 import { useToast } from '@/hooks/use-toast';
 import FullscreenCamera from '../components/FullscreenCamera';
 import MessageRating from '../components/MessageRating';
 import VoiceButton from '../components/VoiceButton';
 import AttachmentMenu from '../components/AttachmentMenu';
+import AuthModal from '../components/AuthModal';
 
 interface Message {
   id: string;
@@ -40,6 +41,8 @@ const Chat = () => {
   const [cameraMode, setCameraMode] = useState<'photo' | 'video'>('photo');
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
   const [showAttachments, setShowAttachments] = useState(false);
+  const [currentUser, setCurrentUser] = useState(authService.getCurrentUser());
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -63,30 +66,54 @@ const Chat = () => {
     scrollToBottom();
   }, [messages]);
 
+  // Отслеживание состояния аутентификации
+  useEffect(() => {
+    const unsubscribe = authService.onAuthStateChanged((user) => {
+      setCurrentUser(user);
+      if (user) {
+        console.log('👤 User authenticated:', user.name);
+        // Загружаем данные пользователя
+        const savedMemory = memoryService.loadConversation();
+        if (savedMemory && savedMemory.messages && savedMemory.messages.length > 0) {
+          setMessages(savedMemory.messages);
+          console.log('💾 Loaded user conversation:', savedMemory.messages.length, 'messages');
+        }
+      } else {
+        setMessages([]);
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
   // Инициализация при загрузке
   useEffect(() => {
     console.log('🚀 Initializing Anuta...');
     
     setHuggingFaceKey('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');
     
-    const savedMemory = memoryService.loadConversation();
-    if (savedMemory && savedMemory.messages && savedMemory.messages.length > 0) {
-      setMessages(savedMemory.messages);
-      console.log('💾 Loaded conversation from memory:', savedMemory.messages.length, 'messages');
+    if (!currentUser) {
+      setShowAuthModal(true);
+    } else {
+      const savedMemory = memoryService.loadConversation();
+      if (savedMemory && savedMemory.messages && savedMemory.messages.length > 0) {
+        setMessages(savedMemory.messages);
+        console.log('💾 Loaded conversation from memory:', savedMemory.messages.length, 'messages');
+      }
     }
     
     setIsInitialized(true);
-  }, [setHuggingFaceKey]);
+  }, [setHuggingFaceKey, currentUser]);
 
   // Автосохранение памяти
   useEffect(() => {
-    if (isInitialized && messages.length > 0) {
+    if (isInitialized && messages.length > 0 && currentUser) {
       memoryService.saveConversation(messages, {
         currentMood,
         lastActivity: new Date()
       });
     }
-  }, [messages, currentMood, isInitialized]);
+  }, [messages, currentMood, isInitialized, currentUser]);
 
   // Закрытие меню вложений при клике вне
   useEffect(() => {
@@ -126,16 +153,33 @@ const Chat = () => {
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      // Формируем контекст с учетом всей истории диалога
-      const conversationContext = messages.map(msg => 
-        `${msg.sender === 'user' ? 'Пользователь' : 'Анюта'}: ${msg.text}`
-      ).join('\n');
+      // Получаем контекст всего диалога из памяти
+      const conversationContext = memoryService.getConversationContext();
+      const relatedMemories = memoryService.findRelatedMemories(textToSend);
+      const userFacts = memoryService.getUserFacts();
       
-      const fullMessage = replyToMessage 
-        ? `Отвечаю на сообщение "${replyToMessage.text}": ${textToSend}\n\nКонтекст диалога:\n${conversationContext}`
-        : `${textToSend}\n\nКонтекст диалога:\n${conversationContext}`;
+      // Формируем расширенный контекст
+      let contextMessage = textToSend;
+      
+      if (replyToMessage) {
+        contextMessage = `Отвечаю на сообщение "${replyToMessage.text}": ${textToSend}`;
+      }
+      
+      if (conversationContext) {
+        contextMessage += `\n\nКонтекст диалога:\n${conversationContext}`;
+      }
+      
+      if (userFacts.length > 0) {
+        const recentFacts = userFacts.slice(-5).map(f => f.text).join('; ');
+        contextMessage += `\n\nЧто я знаю о пользователе: ${recentFacts}`;
+      }
+      
+      if (relatedMemories.length > 0) {
+        const memoryContext = relatedMemories.map(m => m.text || m.content).join('; ');
+        contextMessage += `\n\nСвязанные воспоминания: ${memoryContext}`;
+      }
 
-      const response = await generateResponse(fullMessage);
+      const response = await generateResponse(contextMessage);
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -148,6 +192,11 @@ const Chat = () => {
       
       setMessages(prev => [...prev, aiMessage]);
       setCurrentMood(response.emotion);
+      
+      // Анализируем сообщение пользователя на предмет фактов
+      if (textToSend.includes('меня зовут') || textToSend.includes('я работаю') || textToSend.includes('мне нравится')) {
+        memoryService.saveUserFact(textToSend, 'personal');
+      }
       
       // Озвучиваем ответ
       if (response.text) {
@@ -219,6 +268,12 @@ const Chat = () => {
     memoryService.updateMessageConnection(messageId, { rating, feedback, timestamp: new Date() });
   };
 
+  const handleLogout = () => {
+    authService.logout();
+    setMessages([]);
+    toast({ description: 'Вы вышли из аккаунта' });
+  };
+
   // Обработка свайпа для ответа
   const handleTouchStart = (e: React.TouchEvent, message: Message) => {
     if (message.sender === 'ai') {
@@ -284,7 +339,6 @@ const Chat = () => {
 
         {message.fileData && (
           <div className="bg-black/20 p-2 rounded mb-2">
-            <File className="w-4 h-4 inline mr-2" />
             <span className="text-sm">{message.fileData.name}</span>
           </div>
         )}
@@ -308,29 +362,75 @@ const Chat = () => {
     </div>
   );
 
-  // Анимированное приветствие на разных языках
+  // Анимированное приветствие
   const greetings = ['Привет', 'Hello', 'Hola', '你好', 'Bonjour', 'Guten Tag', 'Ciao', 'こんにちは', 'مرحبا', 'Namaste'];
   const [currentGreeting, setCurrentGreeting] = useState(0);
 
   useEffect(() => {
-    if (messages.length === 0) {
+    if (messages.length === 0 && currentUser) {
       const interval = setInterval(() => {
         setCurrentGreeting(prev => (prev + 1) % greetings.length);
       }, 2000);
       return () => clearInterval(interval);
     }
-  }, [messages.length]);
+  }, [messages.length, currentUser]);
+
+  if (!currentUser) {
+    return (
+      <>
+        <div className="min-h-screen bg-gray-900 text-gray-100 flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-6xl mb-4">💖</div>
+            <h1 className="text-3xl font-light mb-6">Анюта</h1>
+            <p className="text-gray-400 mb-8">Войдите, чтобы начать общение</p>
+            <Button 
+              onClick={() => setShowAuthModal(true)}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              Войти в аккаунт
+            </Button>
+          </div>
+        </div>
+        <AuthModal 
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={() => {
+            setShowAuthModal(false);
+            toast({ description: `Добро пожаловать, ${authService.getCurrentUser()?.name}!` });
+          }}
+        />
+      </>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col">
-      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full relative">
-        
+    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col relative">
+      {/* Плавающая панель пользователя */}
+      <div className="fixed top-4 right-4 z-10">
+        <div className="bg-gray-800 rounded-full px-4 py-2 flex items-center gap-2 shadow-lg">
+          <User className="w-4 h-4" />
+          <span className="text-sm">{currentUser.name}</span>
+          <Button
+            onClick={handleLogout}
+            variant="ghost"
+            size="sm"
+            className="text-gray-400 hover:text-white p-1 h-auto"
+          >
+            <LogOut className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full relative pt-16">
         <div className="flex-1 flex flex-col bg-gray-800 rounded-lg m-4 relative overflow-hidden">
           <div className="flex-1 p-4 overflow-y-auto" ref={chatContainerRef}>
             {messages.length === 0 ? (
               <div className="flex items-center justify-center h-full">
-                <div className="text-4xl font-light text-gray-400 animate-pulse bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
-                  {greetings[currentGreeting]}
+                <div className="text-center">
+                  <div className="text-4xl font-light text-gray-400 animate-pulse bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent mb-4">
+                    {greetings[currentGreeting]}
+                  </div>
+                  <p className="text-gray-500">Начните диалог с Анютой...</p>
                 </div>
               </div>
             ) : (
@@ -426,6 +526,12 @@ const Chat = () => {
         onClose={() => setIsCameraOpen(false)}
         onCapture={cameraMode === 'photo' ? handleCameraCapture : handleVideoCapture}
         mode={cameraMode}
+      />
+
+      <AuthModal 
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={() => setShowAuthModal(false)}
       />
     </div>
   );
