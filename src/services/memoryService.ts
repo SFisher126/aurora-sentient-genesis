@@ -1,4 +1,3 @@
-
 interface ConversationMemory {
   messages: any[];
   metadata: any;
@@ -38,16 +37,9 @@ class MemoryService {
       const saved = localStorage.getItem(this.storageKey);
       if (saved) {
         const memory = JSON.parse(saved);
-        
-        // Convert timestamp strings back to Date objects
-        const messagesWithDates = (memory.messages || []).map((message: any) => ({
-          ...message,
-          timestamp: message.timestamp ? new Date(message.timestamp) : new Date()
-        }));
-        
         return {
           ...memory,
-          messages: messagesWithDates
+          messages: memory.messages || []
         };
       }
     } catch (error) {
@@ -71,15 +63,7 @@ class MemoryService {
   getUserFacts(): UserFact[] {
     try {
       const saved = localStorage.getItem('anyuta_user_facts');
-      if (saved) {
-        const facts = JSON.parse(saved);
-        // Convert timestamp strings back to Date objects
-        return facts.map((fact: any) => ({
-          ...fact,
-          timestamp: fact.timestamp ? new Date(fact.timestamp) : new Date()
-        }));
-      }
-      return [];
+      return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
     }
@@ -119,15 +103,7 @@ class MemoryService {
   getLearningMaterials(): LearningMaterial[] {
     try {
       const saved = localStorage.getItem('anyuta_learning_materials');
-      if (saved) {
-        const materials = JSON.parse(saved);
-        // Convert timestamp strings back to Date objects
-        return materials.map((material: any) => ({
-          ...material,
-          timestamp: material.timestamp ? new Date(material.timestamp) : new Date()
-        }));
-      }
-      return [];
+      return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
     }
