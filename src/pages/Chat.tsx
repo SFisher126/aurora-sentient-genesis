@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Send, Paperclip, Reply, User, LogOut } from 'lucide-react';
-import { useRealAI } from '../hooks/useRealAI';
+import { useQuantumAI } from '../hooks/useQuantumAI';
 import { enhancedSpeechService } from '../services/enhancedSpeechService';
 import { memoryService } from '../services/memoryService';
 import { authService } from '../services/authService';
@@ -13,6 +12,7 @@ import MessageRating from '../components/MessageRating';
 import VoiceButton from '../components/VoiceButton';
 import AttachmentMenu from '../components/AttachmentMenu';
 import AuthModal from '../components/AuthModal';
+import ApiKeySetup from '../components/ApiKeySetup';
 
 interface Message {
   id: string;
@@ -51,9 +51,11 @@ const Chat = () => {
   const { 
     generateResponse, 
     isThinking, 
-    setHuggingFaceKey,
-    hasApiKey 
-  } = useRealAI();
+    setOpenAIKey,
+    setRussianAPIKey,
+    hasActiveAPI,
+    context
+  } = useQuantumAI();
 
   const { toast } = useToast();
 
@@ -88,9 +90,7 @@ const Chat = () => {
 
   // Инициализация при загрузке
   useEffect(() => {
-    console.log('🚀 Initializing Anuta...');
-    
-    setHuggingFaceKey('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');
+    console.log('🚀 Initializing Anuta with Quantum AI...');
     
     if (!currentUser) {
       setShowAuthModal(true);
@@ -103,7 +103,7 @@ const Chat = () => {
     }
     
     setIsInitialized(true);
-  }, [setHuggingFaceKey, currentUser]);
+  }, [currentUser]);
 
   // Автосохранение памяти
   useEffect(() => {
@@ -153,30 +153,13 @@ const Chat = () => {
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      // Получаем контекст всего диалога из памяти
-      const conversationContext = memoryService.getConversationContext();
-      const relatedMemories = memoryService.findRelatedMemories(textToSend);
-      const userFacts = memoryService.getUserFacts();
+      console.log('🧠 Отправляю сообщение в квантовый ИИ...');
       
-      // Формируем расширенный контекст
+      // Формируем контекст
       let contextMessage = textToSend;
       
       if (replyToMessage) {
         contextMessage = `Отвечаю на сообщение "${replyToMessage.text}": ${textToSend}`;
-      }
-      
-      if (conversationContext) {
-        contextMessage += `\n\nКонтекст диалога:\n${conversationContext}`;
-      }
-      
-      if (userFacts.length > 0) {
-        const recentFacts = userFacts.slice(-5).map(f => f.text).join('; ');
-        contextMessage += `\n\nЧто я знаю о пользователе: ${recentFacts}`;
-      }
-      
-      if (relatedMemories.length > 0) {
-        const memoryContext = relatedMemories.map(m => m.text || m.content).join('; ');
-        contextMessage += `\n\nСвязанные воспоминания: ${memoryContext}`;
       }
 
       const response = await generateResponse(contextMessage);
@@ -187,11 +170,15 @@ const Chat = () => {
         sender: 'ai',
         timestamp: new Date(),
         emotion: response.emotion,
-        thoughts: response.thoughts
+        thoughts: response.thoughtProcess
       };
       
       setMessages(prev => [...prev, aiMessage]);
       setCurrentMood(response.emotion);
+      
+      console.log(`💭 Модель: ${response.modelUsed}`);
+      console.log(`🎯 Уверенность: ${response.confidence}`);
+      console.log(`📚 Изучено: ${response.learning.length} концепций`);
       
       // Анализируем сообщение пользователя на предмет фактов
       if (textToSend.includes('меня зовут') || textToSend.includes('я работаю') || textToSend.includes('мне нравится')) {
@@ -201,7 +188,7 @@ const Chat = () => {
       // Озвучиваем ответ
       if (response.text) {
         try {
-          await enhancedSpeechService.speak(response.text);
+          await enhancedSpeechService.speak(response.text, response.emotion);
         } catch (error) {
           console.error('Speech error:', error);
         }
@@ -211,7 +198,7 @@ const Chat = () => {
       console.error('Ошибка генерации ответа:', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: "Прости, у меня проблемы с подключением... Но я все равно учусь! 💭",
+        text: "Прости, у меня проблемы с мышлением... Но я все равно учусь! Попробуй добавить API ключ для лучшей работы 💭",
         sender: 'ai',
         timestamp: new Date(),
         emotion: 'confused'
@@ -390,15 +377,15 @@ const Chat = () => {
             <div className="space-y-3 text-sm text-gray-500">
               <div className="flex items-center justify-center gap-2">
                 <span>🧠</span>
-                <span>Персональная память о ваших разговорах</span>
+                <span>Квантовое мышление с настоящими API</span>
               </div>
               <div className="flex items-center justify-center gap-2">
                 <span>🎯</span>
-                <span>Индивидуальная настройка под ваш стиль</span>
+                <span>Персональная память и обучение</span>
               </div>
               <div className="flex items-center justify-center gap-2">
                 <span>💾</span>
-                <span>Сохранение всей истории общения</span>
+                <span>Поток мыслей и эмоций</span>
               </div>
             </div>
             <Button 
@@ -443,6 +430,20 @@ const Chat = () => {
       </div>
 
       <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full relative pt-16">
+        {/* API Setup */}
+        <div className="px-4 pt-4">
+          <ApiKeySetup 
+            onApiKeySet={(key) => {
+              setOpenAIKey(key);
+              toast({ 
+                description: '🧠 Квантовый разум Анюты активирован!',
+                className: 'bg-green-800 text-white border-green-600'
+              });
+            }}
+            hasApiKey={hasActiveAPI}
+          />
+        </div>
+
         <div className="flex-1 flex flex-col bg-gray-800 rounded-lg m-4 relative overflow-hidden">
           <div className="flex-1 p-4 overflow-y-auto" ref={chatContainerRef}>
             {messages.length === 0 ? (
@@ -452,6 +453,9 @@ const Chat = () => {
                     {greetings[currentGreeting]}
                   </div>
                   <p className="text-gray-500">Начните диалог с Анютой...</p>
+                  {hasActiveAPI && (
+                    <p className="text-green-400 text-sm mt-2">✨ Квантовый ИИ готов к мышлению</p>
+                  )}
                 </div>
               </div>
             ) : (
@@ -467,7 +471,7 @@ const Chat = () => {
                       <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
                       <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
                     </div>
-                    <span className="text-sm">думаю...</span>
+                    <span className="text-sm">квантовое мышление...</span>
                   </div>
                 </div>
               </div>
