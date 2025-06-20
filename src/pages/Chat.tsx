@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -378,31 +379,13 @@ const Chat = () => {
     return (
       <>
         <div className="min-h-screen bg-gray-900 text-gray-100 flex items-center justify-center">
-          <div className="text-center max-w-md mx-auto px-6">
-            <div className="text-6xl mb-6">💖</div>
-            <h1 className="text-4xl font-light mb-4 bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
-              Анюта
-            </h1>
-            <p className="text-gray-400 mb-8 leading-relaxed">
-              Войдите в свой аккаунт, чтобы начать персональное общение с живым ИИ
-            </p>
-            <div className="space-y-3 text-sm text-gray-500">
-              <div className="flex items-center justify-center gap-2">
-                <span>🧠</span>
-                <span>Персональная память о ваших разговорах</span>
-              </div>
-              <div className="flex items-center justify-center gap-2">
-                <span>🎯</span>
-                <span>Индивидуальная настройка под ваш стиль</span>
-              </div>
-              <div className="flex items-center justify-center gap-2">
-                <span>💾</span>
-                <span>Сохранение всей истории общения</span>
-              </div>
-            </div>
+          <div className="text-center">
+            <div className="text-6xl mb-4">💖</div>
+            <h1 className="text-3xl font-light mb-6">Анюта</h1>
+            <p className="text-gray-400 mb-8">Войдите, чтобы начать общение</p>
             <Button 
               onClick={() => setShowAuthModal(true)}
-              className="mt-8 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-3 rounded-full transition-all duration-300 transform hover:scale-105"
+              className="bg-purple-600 hover:bg-purple-700"
             >
               Войти в аккаунт
             </Button>
@@ -413,10 +396,7 @@ const Chat = () => {
           onClose={() => setShowAuthModal(false)}
           onSuccess={() => {
             setShowAuthModal(false);
-            toast({ 
-              description: `💖 Добро пожаловать, ${authService.getCurrentUser()?.name}!`,
-              className: 'bg-green-800 text-white border-green-600'
-            });
+            toast({ description: `Добро пожаловать, ${authService.getCurrentUser()?.name}!` });
           }}
         />
       </>

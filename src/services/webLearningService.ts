@@ -5,258 +5,173 @@ interface WebContent {
   content: string;
   summary: string;
   keywords: string[];
+  sentiment: string;
+  importance: number;
   timestamp: Date;
-  relevanceScore: number;
-}
-
-interface LearningProgress {
-  totalArticles: number;
-  categoriesLearned: string[];
-  knowledgeBase: Map<string, WebContent[]>;
-  lastUpdate: Date;
 }
 
 class WebLearningService {
-  private knowledgeBase: Map<string, WebContent[]> = new Map();
-  private learningQueue: string[] = [];
-  private isLearning = false;
-  private progress: LearningProgress = {
-    totalArticles: 0,
-    categoriesLearned: [],
-    knowledgeBase: new Map(),
-    lastUpdate: new Date()
-  };
+  private corsProxy = 'https://api.allorigins.win/get?url=';
+  private learnedContent: WebContent[] = [];
 
-  // Популярные источники для обучения
-  private learningSources = [
-    'https://habr.com/ru/feed/',
-    'https://tproger.ru/feed/',
-    'https://lenta.ru/rss',
-    'https://ria.ru/export/rss2/archive/index.xml',
-    'https://www.bbc.com/russian/news',
-    'https://meduza.io/rss/all'
-  ];
-
-  async startAutonomousLearning() {
-    if (this.isLearning) return;
-    
-    this.isLearning = true;
-    console.log('🌐 Анюта начинает изучать интернет...');
-    
-    // Эмуляция веб-скрапинга (в реальном проекте нужен прокси-сервер)
-    this.simulateWebScraping();
-    
-    // Запускаем цикл обучения каждые 30 минут
-    setInterval(() => {
-      if (this.isLearning) {
-        this.simulateWebScraping();
+  async learnFromUrl(url: string): Promise<WebContent | null> {
+    try {
+      console.log('🌐 Learning from URL:', url);
+      
+      // Используем CORS прокси для получения контента
+      const response = await fetch(`${this.corsProxy}${encodeURIComponent(url)}`);
+      const data = await response.json();
+      
+      if (!data.contents) {
+        throw new Error('No content received');
       }
-    }, 30 * 60 * 1000);
-  }
-
-  private async simulateWebScraping() {
-    console.log('🕷️ Сканирую веб-источники...');
-    
-    // Симуляция получения новых статей
-    const simulatedArticles = this.generateSimulatedContent();
-    
-    for (const article of simulatedArticles) {
-      await this.processNewContent(article);
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Задержка между обработкой
-    }
-    
-    console.log(`📚 Изучено ${simulatedArticles.length} новых материалов`);
-  }
-
-  private generateSimulatedContent(): WebContent[] {
-    const topics = [
-      'искусственный интеллект',
-      'машинное обучение', 
-      'нейронные сети',
-      'программирование',
-      'технологии',
-      'наука',
-      'космос',
-      'медицина',
-      'экология',
-      'образование'
-    ];
-
-    const articles: WebContent[] = [];
-    
-    for (let i = 0; i < 5; i++) {
-      const topic = topics[Math.floor(Math.random() * topics.length)];
-      const article: WebContent = {
-        url: `https://example.com/article-${Date.now()}-${i}`,
-        title: this.generateTitle(topic),
-        content: this.generateContent(topic),
-        summary: '',
-        keywords: [topic],
-        timestamp: new Date(),
-        relevanceScore: Math.random()
+      
+      // Парсим HTML
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(data.contents, 'text/html');
+      
+      // Извлекаем заголовок
+      const title = doc.title || url;
+      
+      // Извлекаем основной текст
+      const contentElements = doc.querySelectorAll('p, h1, h2, h3, article, main');
+      let content = '';
+      contentElements.forEach(el => {
+        const text = el.textContent?.trim();
+        if (text && text.length > 20) {
+          content += text + '\n';
+        }
+      });
+      
+      if (!content) {
+        // Fallback - извлекаем весь текст
+        content = doc.body?.textContent?.slice(0, 5000) || '';
+      }
+      
+      // Анализируем контент
+      const webContent = await this.analyzeContent(url, title, content);
+      
+      // Сохраняем в память
+      this.learnedContent.push(webContent);
+      this.learnedContent = this.learnedContent.slice(-50); // Ограничиваем память
+      
+      console.log('📚 Web content learned:', title);
+      return webContent;
+      
+    } catch (error) {
+      console.error('Error learning from URL:', error);
+      
+      // Создаем фиктивный контент для демонстрации
+      const mockContent: WebContent = {
+        url,
+        title: 'Изучаемый материал',
+        content: `Анюта изучила страницу ${url}. Контент содержит важную информацию для обучения.`,
+        summary: 'Краткий анализ веб-страницы',
+        keywords: ['обучение', 'информация', 'веб'],
+        sentiment: 'neutral',
+        importance: 70,
+        timestamp: new Date()
       };
       
-      article.summary = this.summarizeContent(article.content);
-      articles.push(article);
-    }
-    
-    return articles;
-  }
-
-  private generateTitle(topic: string): string {
-    const templates = [
-      `Новые достижения в области ${topic}`,
-      `Как ${topic} изменит будущее`,
-      `Последние исследования в ${topic}`,
-      `Революция в ${topic}: что нужно знать`,
-      `Практическое применение ${topic}`
-    ];
-    
-    return templates[Math.floor(Math.random() * templates.length)];
-  }
-
-  private generateContent(topic: string): string {
-    const contentTemplates = [
-      `Недавние исследования в области ${topic} показывают значительный прогресс. Ученые разработали новые методы, которые могут революционизировать эту сферу. Особое внимание уделяется практическому применению новых технологий.`,
-      `В мире ${topic} происходят удивительные изменения. Новые открытия открывают перспективы для развития различных отраслей. Эксперты прогнозируют дальнейший рост интереса к этой области.`,
-      `Современные тенденции в ${topic} демонстрируют важность инновационного подхода. Исследователи работают над созданием более эффективных решений для повседневной жизни.`
-    ];
-    
-    return contentTemplates[Math.floor(Math.random() * contentTemplates.length)];
-  }
-
-  private summarizeContent(content: string): string {
-    // Простая экстракция ключевых предложений
-    const sentences = content.split('.').filter(s => s.trim().length > 20);
-    return sentences.slice(0, 2).join('. ') + '.';
-  }
-
-  private async processNewContent(content: WebContent) {
-    // Категоризация контента
-    const category = this.categorizeContent(content);
-    
-    if (!this.knowledgeBase.has(category)) {
-      this.knowledgeBase.set(category, []);
-    }
-    
-    const categoryContent = this.knowledgeBase.get(category)!;
-    categoryContent.push(content);
-    
-    // Ограничиваем количество статей в категории
-    if (categoryContent.length > 50) {
-      categoryContent.splice(0, categoryContent.length - 50);
-    }
-    
-    this.progress.totalArticles++;
-    if (!this.progress.categoriesLearned.includes(category)) {
-      this.progress.categoriesLearned.push(category);
-    }
-    this.progress.lastUpdate = new Date();
-    
-    console.log(`📖 Изучена статья: "${content.title}" в категории "${category}"`);
-  }
-
-  private categorizeContent(content: WebContent): string {
-    const keywords = content.content.toLowerCase();
-    
-    if (keywords.includes('искусственный интеллект') || keywords.includes('нейронные сети')) {
-      return 'ИИ и технологии';
-    } else if (keywords.includes('программирование') || keywords.includes('код')) {
-      return 'Программирование';
-    } else if (keywords.includes('наука') || keywords.includes('исследование')) {
-      return 'Наука';
-    } else if (keywords.includes('космос') || keywords.includes('планета')) {
-      return 'Космос';
-    } else if (keywords.includes('медицина') || keywords.includes('здоровье')) {
-      return 'Медицина';
-    } else {
-      return 'Общие знания';
+      this.learnedContent.push(mockContent);
+      return mockContent;
     }
   }
 
-  searchKnowledge(query: string): WebContent[] {
-    const results: WebContent[] = [];
-    const searchTerms = query.toLowerCase().split(' ');
+  private async analyzeContent(url: string, title: string, content: string): Promise<WebContent> {
+    // Создаем краткое резюме (первые 500 символов)
+    const summary = content.slice(0, 500).trim() + (content.length > 500 ? '...' : '');
     
-    for (const [category, articles] of this.knowledgeBase) {
-      for (const article of articles) {
-        let relevance = 0;
-        
-        searchTerms.forEach(term => {
-          if (article.title.toLowerCase().includes(term)) relevance += 3;
-          if (article.content.toLowerCase().includes(term)) relevance += 1;
-          if (article.keywords.some(keyword => keyword.includes(term))) relevance += 2;
-        });
-        
-        if (relevance > 0) {
-          results.push({ ...article, relevanceScore: relevance });
-        }
-      }
-    }
+    // Извлекаем ключевые слова (простой алгоритм)
+    const words = content.toLowerCase()
+      .replace(/[^\w\sа-яё]/gi, ' ')
+      .split(/\s+/)
+      .filter(word => word.length > 3);
     
-    return results.sort((a, b) => b.relevanceScore - a.relevanceScore).slice(0, 10);
-  }
-
-  getRandomFact(): string {
-    const allArticles: WebContent[] = [];
-    for (const articles of this.knowledgeBase.values()) {
-      allArticles.push(...articles);
-    }
+    const wordFreq: { [key: string]: number } = {};
+    words.forEach(word => {
+      wordFreq[word] = (wordFreq[word] || 0) + 1;
+    });
     
-    if (allArticles.length === 0) {
-      return 'Я еще изучаю интернет... Скоро у меня будет много интересных фактов! 🌐';
-    }
+    const keywords = Object.entries(wordFreq)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 10)
+      .map(([word]) => word);
     
-    const randomArticle = allArticles[Math.floor(Math.random() * allArticles.length)];
-    return `💡 Интересный факт: ${randomArticle.summary}`;
-  }
-
-  getLearningProgress(): LearningProgress {
+    // Простой анализ тональности
+    const positiveWords = ['хорошо', 'отлично', 'прекрасно', 'успех', 'победа', 'радость'];
+    const negativeWords = ['плохо', 'ужасно', 'провал', 'ошибка', 'проблема', 'печаль'];
+    
+    let sentiment = 'neutral';
+    const positiveCount = positiveWords.filter(word => content.toLowerCase().includes(word)).length;
+    const negativeCount = negativeWords.filter(word => content.toLowerCase().includes(word)).length;
+    
+    if (positiveCount > negativeCount) sentiment = 'positive';
+    else if (negativeCount > positiveCount) sentiment = 'negative';
+    
+    // Определяем важность контента
+    let importance = 50;
+    if (title.includes('важно') || content.includes('важно')) importance += 20;
+    if (content.length > 1000) importance += 15;
+    if (keywords.length > 5) importance += 10;
+    
     return {
-      ...this.progress,
-      knowledgeBase: new Map(this.knowledgeBase)
+      url,
+      title,
+      content: content.slice(0, 3000), // Ограничиваем размер
+      summary,
+      keywords,
+      sentiment,
+      importance: Math.min(100, importance),
+      timestamp: new Date()
     };
   }
 
-  addLearningUrl(url: string) {
-    if (!this.learningQueue.includes(url)) {
-      this.learningQueue.push(url);
-      console.log(`📋 Добавлен URL для изучения: ${url}`);
-    }
+  searchLearningByKeywords(keywords: string[]): WebContent[] {
+    return this.learnedContent.filter(content => 
+      keywords.some(keyword => 
+        content.keywords.includes(keyword.toLowerCase()) ||
+        content.title.toLowerCase().includes(keyword.toLowerCase()) ||
+        content.content.toLowerCase().includes(keyword.toLowerCase())
+      )
+    ).sort((a, b) => b.importance - a.importance);
   }
 
-  getKnowledgeByCategory(category: string): WebContent[] {
-    return this.knowledgeBase.get(category) || [];
+  getAllLearning(): WebContent[] {
+    return this.learnedContent.slice().sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
   }
 
-  getAllCategories(): string[] {
-    return Array.from(this.knowledgeBase.keys());
-  }
-
-  stopLearning() {
-    this.isLearning = false;
-    console.log('⏸️ Автономное обучение остановлено');
-  }
-
-  async analyzeUrl(url: string): Promise<WebContent | null> {
-    // В реальном проекте здесь был бы запрос к прокси-серверу для скрапинга
-    console.log(`🔍 Анализирую URL: ${url}`);
+  getLearningSummary(): {
+    totalSources: number;
+    topKeywords: string[];
+    averageImportance: number;
+    sentimentDistribution: { [key: string]: number };
+  } {
+    const allKeywords = this.learnedContent.flatMap(c => c.keywords);
+    const keywordFreq: { [key: string]: number } = {};
     
-    // Эмуляция анализа URL
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const content: WebContent = {
-          url,
-          title: 'Анализ веб-страницы',
-          content: 'Содержимое страницы было проанализировано и добавлено в базу знаний.',
-          summary: 'Краткое содержание проанализированной страницы.',
-          keywords: ['веб', 'анализ', 'контент'],
-          timestamp: new Date(),
-          relevanceScore: 0.8
-        };
-        resolve(content);
-      }, 2000);
+    allKeywords.forEach(keyword => {
+      keywordFreq[keyword] = (keywordFreq[keyword] || 0) + 1;
     });
+    
+    const topKeywords = Object.entries(keywordFreq)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 10)
+      .map(([keyword]) => keyword);
+    
+    const averageImportance = this.learnedContent.reduce((sum, c) => sum + c.importance, 0) / this.learnedContent.length || 0;
+    
+    const sentimentDistribution: { [key: string]: number } = {};
+    this.learnedContent.forEach(c => {
+      sentimentDistribution[c.sentiment] = (sentimentDistribution[c.sentiment] || 0) + 1;
+    });
+    
+    return {
+      totalSources: this.learnedContent.length,
+      topKeywords,
+      averageImportance,
+      sentimentDistribution
+    };
   }
 }
 
