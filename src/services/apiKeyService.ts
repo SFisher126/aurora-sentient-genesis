@@ -7,6 +7,8 @@ class APIKeyService {
     russian_api: ''
   };
 
+  private listeners: Set<() => void> = new Set();
+
   constructor() {
     this.loadKeys();
   }
@@ -18,28 +20,41 @@ class APIKeyService {
     this.keys.russian_api = localStorage.getItem('russian_api_key') || '';
   }
 
+  private notifyListeners() {
+    this.listeners.forEach(listener => listener());
+  }
+
+  addListener(listener: () => void) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
   setOpenAIKey(key: string) {
     this.keys.openai = key;
     localStorage.setItem('openai_key', key);
-    console.log('🔑 OpenAI API key установлен');
+    this.notifyListeners();
+    console.log('🔑 OpenAI API key установлен и обновлен');
   }
 
   setHuggingFaceKey(key: string) {
     this.keys.huggingface = key;
     localStorage.setItem('hf_api_key', key);
-    console.log('🔑 HuggingFace API key установлен');
+    this.notifyListeners();
+    console.log('🔑 HuggingFace API key установлен и обновлен');
   }
 
   setElevenLabsKey(key: string) {
     this.keys.elevenlabs = key;
     localStorage.setItem('elevenlabs_key', key);
-    console.log('🔑 ElevenLabs API key установлен');
+    this.notifyListeners();
+    console.log('🔑 ElevenLabs API key установлен и обновлен');
   }
 
   setRussianAPIKey(key: string) {
     this.keys.russian_api = key;
     localStorage.setItem('russian_api_key', key);
-    console.log('🔑 Russian API key установлен');
+    this.notifyListeners();
+    console.log('🔑 Russian API key установлен и обновлен');
   }
 
   getOpenAIKey(): string {
@@ -60,6 +75,14 @@ class APIKeyService {
 
   hasAnyKey(): boolean {
     return !!(this.keys.openai || this.keys.huggingface || this.keys.russian_api);
+  }
+
+  hasElevenLabsKey(): boolean {
+    return !!this.keys.elevenlabs;
+  }
+
+  getAllKeys() {
+    return { ...this.keys };
   }
 }
 
