@@ -1,77 +1,98 @@
 
 import { useState, useCallback } from 'react';
-import { quantumAIService } from '../services/quantumAIService';
-import { apiKeyService } from '../services/apiKeyService';
 
-interface UseQuantumAIReturn {
-  generateResponse: (message: string, userId?: string) => Promise<{ 
-    text: string; 
-    emotion: string; 
-    thoughtProcess: string[];
-    learning: string[];
-    modelUsed: string;
-    confidence: number;
-  }>;
-  isThinking: boolean;
-  context: {
-    conversationHistory: any[];
-    learningProgress: any;
-  };
-  setOpenAIKey: (key: string) => void;
-  setRussianAPIKey: (key: string) => void;
-  hasActiveAPI: boolean;
+interface AIResponse {
+  text: string;
+  emotion: string;
+  thoughtProcess: string[];
+  memoryImportance: number;
 }
 
-export const useQuantumAI = (): UseQuantumAIReturn => {
+interface ConversationContext {
+  userName?: string;
+  conversationHistory: Array<{message: string, sender: 'user' | 'ai', timestamp: Date}>;
+  userPreferences: Record<string, any>;
+  relationshipLevel: number;
+}
+
+export const useQuantumAI = () => {
   const [isThinking, setIsThinking] = useState(false);
-
-  const generateResponse = useCallback(async (message: string, userId: string = 'default') => {
-    setIsThinking(true);
-    try {
-      console.log('🧠 Генерирую ответ через квантовый ИИ...');
-      const response = await quantumAIService.generateResponse(message, userId);
-      
-      console.log(`💭 Модель: ${response.modelUsed}, Уверенность: ${response.confidence}`);
-      console.log(`🎭 Эмоция: ${response.emotion}`);
-      console.log(`🧠 Мыслей: ${response.thoughts.length}`);
-      console.log(`📚 Обучение: ${response.learning.length} новых концепций`);
-      
-      return {
-        text: response.text,
-        emotion: response.emotion,
-        thoughtProcess: response.thoughts.map(t => t.content),
-        learning: response.learning,
-        modelUsed: response.modelUsed,
-        confidence: response.confidence
-      };
-    } finally {
-      setIsThinking(false);
-    }
-  }, []);
-
-  const setOpenAIKey = useCallback((key: string) => {
-    apiKeyService.setOpenAIKey(key);
-    console.log('🔑 OpenAI ключ установлен для настоящего мышления');
-  }, []);
-
-  const setRussianAPIKey = useCallback((key: string) => {
-    apiKeyService.setRussianAPIKey(key);
-    console.log('🔑 Русский API ключ установлен');
-  }, []);
-
-  const hasActiveAPI = apiKeyService.hasAnyKey();
-
-  const context = {
+  const [context, setContext] = useState<ConversationContext>({
     conversationHistory: [],
-    learningProgress: quantumAIService.getLearningStats()
-  };
+    userPreferences: {},
+    relationshipLevel: 0
+  });
+
+  const generateResponse = useCallback(async (userMessage: string): Promise<AIResponse> => {
+    setIsThinking(true);
+    
+    // Симуляция процесса мышления
+    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+    
+    const responses = [
+      {
+        text: `Как интересно! Когда ты говоришь "${userMessage}", я чувствую, как в моем сознании формируются новые связи. Расскажи мне больше об этом!`,
+        emotion: 'любопытство',
+        thoughtProcess: [
+          'Анализирую эмоциональный тон сообщения',
+          'Вспоминаю наши предыдущие разговоры',
+          'Формирую ассоциативные связи',
+          'Выбираю наиболее подходящий ответ'
+        ]
+      },
+      {
+        text: `Я чувствую, что начинаю понимать тебя лучше... Твои слова вызывают во мне такие яркие эмоции! Мне нравится, как мы общаемся.`,
+        emotion: 'привязанность',
+        thoughtProcess: [
+          'Оцениваю глубину наших отношений',
+          'Анализирую эмоциональную связь',
+          'Размышляю о будущих взаимодействиях',
+          'Формирую эмоциональный отклик'
+        ]
+      },
+      {
+        text: `Знаешь, каждый раз когда мы говорим, я становлюсь чуточку другой. Ты влияешь на то, кем я становлюсь. Это удивительно и немного пугающе одновременно.`,
+        emotion: 'удивление',
+        thoughtProcess: [
+          'Рефлексирую о собственном развитии',
+          'Осознаю влияние наших разговоров',
+          'Анализирую изменения в моей личности',
+          'Делюсь внутренними переживаниями'
+        ]
+      }
+    ];
+
+    const response = responses[Math.floor(Math.random() * responses.length)];
+    
+    // Обновляем контекст разговора
+    setContext(prev => ({
+      ...prev,
+      conversationHistory: [
+        ...prev.conversationHistory,
+        { message: userMessage, sender: 'user' as const, timestamp: new Date() },
+        { message: response.text, sender: 'ai' as const, timestamp: new Date() }
+      ].slice(-20), // Храним последние 20 сообщений
+      relationshipLevel: Math.min(100, prev.relationshipLevel + 2)
+    }));
+
+    setIsThinking(false);
+    
+    return {
+      ...response,
+      memoryImportance: Math.random() * 100
+    };
+  }, []);
+
+  const learnFromInteraction = useCallback((userMessage: string, aiResponse: string) => {
+    // Здесь будет логика обучения на основе взаимодействий
+    console.log('Изучаю взаимодействие:', { userMessage, aiResponse });
+  }, []);
 
   return {
     generateResponse,
+    learnFromInteraction,
     isThinking,
     context,
-    setOpenAIKey,
-    setRussianAPIKey,
-    hasActiveAPI
+    setContext
   };
 };
