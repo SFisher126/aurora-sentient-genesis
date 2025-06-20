@@ -12,7 +12,7 @@ import MessageRating from '../components/MessageRating';
 import VoiceButton from '../components/VoiceButton';
 import AttachmentMenu from '../components/AttachmentMenu';
 import AuthModal from '../components/AuthModal';
-import ApiKeySetup from '../components/ApiKeySetup';
+import APIKeySetup from '../components/APIKeySetup';
 
 interface Message {
   id: string;
@@ -432,7 +432,7 @@ const Chat = () => {
       <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full relative pt-16">
         {/* API Setup */}
         <div className="px-4 pt-4">
-          <ApiKeySetup 
+          <APIKeySetup 
             onApiKeySet={(key) => {
               setOpenAIKey(key);
               toast({ 
