@@ -1,72 +1,54 @@
 
-import { authService } from './authService';
-
 interface ConversationMemory {
   messages: any[];
-  contextData: any;
-  learningHistory: any[];
-  personalityState: any;
-  lastUpdated: Date;
-  userId: string;
-  conversationContext: string[];
+  metadata: any;
+}
+
+interface UserFact {
+  text: string;
+  category: string;
+  timestamp: Date;
+}
+
+interface LearningMaterial {
+  url: string;
+  content: string;
+  analysis: any;
+  timestamp: Date;
 }
 
 class MemoryService {
-  private getStorageKey(suffix: string): string {
-    const userKey = authService.getUserStorageKey();
-    return `${userKey}_${suffix}`;
-  }
+  private storageKey = 'anyuta_memory';
 
-  saveConversation(messages: any[], context?: any) {
-    const userId = authService.getCurrentUser()?.id || 'guest';
-    
-    // Создаем контекст диалога - последние важные сообщения
-    const conversationContext = messages.slice(-20).map(msg => 
-      `${msg.sender === 'user' ? 'Пользователь' : 'Анюта'}: ${msg.text}`
-    );
-    
+  saveConversation(messages: any[], metadata: any = {}) {
     const memory: ConversationMemory = {
       messages,
-      contextData: context || {},
-      learningHistory: this.getLearningHistory(),
-      personalityState: this.getPersonalityState(),
-      lastUpdated: new Date(),
-      userId,
-      conversationContext
+      metadata: {
+        ...metadata,
+        lastSaved: new Date()
+      }
     };
     
-    localStorage.setItem(this.getStorageKey('conversation_memory'), JSON.stringify(memory));
-    console.log('💾 Conversation saved to memory', { 
-      messageCount: messages.length, 
-      userId,
-      contextSize: conversationContext.length 
-    });
+    localStorage.setItem(this.storageKey, JSON.stringify(memory));
+    console.log('💾 Conversation saved to memory');
   }
 
   loadConversation(): ConversationMemory | null {
     try {
-      const saved = localStorage.getItem(this.getStorageKey('conversation_memory'));
+      const saved = localStorage.getItem(this.storageKey);
       if (saved) {
         const memory = JSON.parse(saved);
         
-        // Восстанавливаем объекты Date из строк
-        if (memory.messages) {
-          memory.messages = memory.messages.map((msg: any) => ({
-            ...msg,
-            timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date()
-          }));
-        }
+        // Convert timestamp strings back to Date objects
+        const messagesWithDates = (memory.messages || []).map((message: any) => ({
+          ...message,
+          timestamp: message.timestamp ? new Date(message.timestamp) : new Date()
+        }));
         
-        if (memory.lastUpdated) {
-          memory.lastUpdated = new Date(memory.lastUpdated);
-        }
-        
-        console.log('🧠 Memory loaded', { 
-          messageCount: memory.messages?.length || 0,
-          userId: memory.userId,
-          contextSize: memory.conversationContext?.length || 0
-        });
-        return memory;
+        return {
+          ...memory,
+          messages: messagesWithDates
+        };
       }
     } catch (error) {
       console.error('Memory loading error:', error);
@@ -74,88 +56,24 @@ class MemoryService {
     return null;
   }
 
-  getConversationContext(): string {
-    const memory = this.loadConversation();
-    if (memory?.conversationContext) {
-      return memory.conversationContext.join('\n');
-    }
-    return '';
-  }
-
-  saveLearningMaterial(url: string, content: string, analysis: any) {
-    const existing = this.getLearningHistory();
-    const userId = authService.getCurrentUser()?.id || 'guest';
-    
-    const newLearning = {
-      id: Date.now().toString(),
-      url,
-      content: content.slice(0, 2000),
-      analysis,
-      timestamp: new Date(),
-      importance: analysis.importance || Math.random() * 100,
-      userId
-    };
-    
-    existing.push(newLearning);
-    localStorage.setItem(this.getStorageKey('learning_data'), JSON.stringify(existing.slice(-50)));
-    console.log('📚 Learning material saved:', url, 'for user:', userId);
-  }
-
-  getLearningHistory(): any[] {
-    try {
-      const saved = localStorage.getItem(this.getStorageKey('learning_data'));
-      if (saved) {
-        const history = JSON.parse(saved);
-        return history.map((item: any) => ({
-          ...item,
-          timestamp: item.timestamp ? new Date(item.timestamp) : new Date()
-        }));
-      }
-      return [];
-    } catch {
-      return [];
-    }
-  }
-
-  savePersonalityState(state: any) {
-    const userId = authService.getCurrentUser()?.id || 'guest';
-    localStorage.setItem(this.getStorageKey('personality'), JSON.stringify({
-      ...state,
-      userId,
-      lastUpdated: new Date()
-    }));
-  }
-
-  getPersonalityState(): any {
-    try {
-      const saved = localStorage.getItem(this.getStorageKey('personality'));
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  }
-
-  // Новый метод для сохранения важных фактов о пользователе
-  saveUserFact(fact: string, category: string = 'general') {
+  saveUserFact(text: string, category: string = 'general') {
     const facts = this.getUserFacts();
-    const newFact = {
-      id: Date.now().toString(),
-      text: fact,
+    const newFact: UserFact = {
+      text,
       category,
-      timestamp: new Date(),
-      importance: 100
+      timestamp: new Date()
     };
     
     facts.push(newFact);
-    localStorage.setItem(this.getStorageKey('user_facts'), JSON.stringify(facts.slice(-100)));
-    console.log('💡 User fact saved:', fact);
+    localStorage.setItem('anyuta_user_facts', JSON.stringify(facts));
   }
 
-  getUserFacts(): any[] {
+  getUserFacts(): UserFact[] {
     try {
-      const saved = localStorage.getItem(this.getStorageKey('user_facts'));
+      const saved = localStorage.getItem('anyuta_user_facts');
       if (saved) {
         const facts = JSON.parse(saved);
+        // Convert timestamp strings back to Date objects
         return facts.map((fact: any) => ({
           ...fact,
           timestamp: fact.timestamp ? new Date(fact.timestamp) : new Date()
@@ -167,99 +85,67 @@ class MemoryService {
     }
   }
 
-  // Улучшенный поиск связанных воспоминаний с контекстом
-  findRelatedMemories(query: string, limit: number = 10): any[] {
+  getConversationContext(): string {
     const memory = this.loadConversation();
-    const learning = this.getLearningHistory();
+    if (!memory || !memory.messages) return '';
+    
+    const recentMessages = memory.messages.slice(-10);
+    return recentMessages.map(m => `${m.sender}: ${m.text}`).join('\n');
+  }
+
+  findRelatedMemories(query: string): any[] {
     const facts = this.getUserFacts();
+    const lowerQuery = query.toLowerCase();
     
-    if (!memory?.messages) return [];
-    
-    const queryLower = query.toLowerCase();
-    
-    // Поиск в сообщениях
-    const relatedMessages = memory.messages.filter(msg => 
-      msg.text.toLowerCase().includes(queryLower) ||
-      msg.thoughts?.some((thought: string) => thought.toLowerCase().includes(queryLower))
-    ).slice(-5);
-    
-    // Поиск в изученном материале
-    const relatedLearning = learning.filter(item =>
-      item.content.toLowerCase().includes(queryLower) ||
-      item.analysis?.topic?.toLowerCase().includes(queryLower)
-    ).slice(-3);
-    
-    // Поиск в фактах о пользователе
-    const relatedFacts = facts.filter(fact =>
-      fact.text.toLowerCase().includes(queryLower)
-    ).slice(-2);
-    
-    return [...relatedMessages, ...relatedLearning, ...relatedFacts];
+    return facts.filter(fact => 
+      fact.text.toLowerCase().includes(lowerQuery)
+    );
   }
 
-  clearMemory() {
-    const keys = [
-      this.getStorageKey('conversation_memory'),
-      this.getStorageKey('learning_data'),
-      this.getStorageKey('personality'),
-      this.getStorageKey('user_facts')
-    ];
+  saveLearningMaterial(url: string, analysis: any) {
+    const materials = this.getLearningMaterials();
+    const newMaterial: LearningMaterial = {
+      url,
+      content: analysis.summary || '',
+      analysis,
+      timestamp: new Date()
+    };
     
-    keys.forEach(key => localStorage.removeItem(key));
-    console.log('🗑️ Memory cleared for current user');
+    materials.push(newMaterial);
+    localStorage.setItem('anyuta_learning_materials', JSON.stringify(materials.slice(-50)));
+    console.log('📚 Learning material saved:', url);
   }
 
-  exportMemory(): string {
-    const memory = this.loadConversation();
-    const learning = this.getLearningHistory();
-    const personality = this.getPersonalityState();
-    const facts = this.getUserFacts();
-    const userId = authService.getCurrentUser()?.id || 'guest';
-    
-    return JSON.stringify({
-      memory,
-      learning,
-      personality,
-      facts,
-      userId,
-      exportDate: new Date()
-    }, null, 2);
-  }
-
-  importMemory(data: string): boolean {
+  getLearningMaterials(): LearningMaterial[] {
     try {
-      const imported = JSON.parse(data);
-      
-      if (imported.memory) {
-        localStorage.setItem(this.getStorageKey('conversation_memory'), JSON.stringify(imported.memory));
+      const saved = localStorage.getItem('anyuta_learning_materials');
+      if (saved) {
+        const materials = JSON.parse(saved);
+        // Convert timestamp strings back to Date objects
+        return materials.map((material: any) => ({
+          ...material,
+          timestamp: material.timestamp ? new Date(material.timestamp) : new Date()
+        }));
       }
-      if (imported.learning) {
-        localStorage.setItem(this.getStorageKey('learning_data'), JSON.stringify(imported.learning));
-      }
-      if (imported.personality) {
-        localStorage.setItem(this.getStorageKey('personality'), JSON.stringify(imported.personality));
-      }
-      if (imported.facts) {
-        localStorage.setItem(this.getStorageKey('user_facts'), JSON.stringify(imported.facts));
-      }
-      
-      console.log('📥 Memory imported successfully for current user');
-      return true;
-    } catch (error) {
-      console.error('Import error:', error);
-      return false;
+      return [];
+    } catch {
+      return [];
     }
   }
 
-  updateMessageConnection(messageId: string, connectionData: any) {
-    const memory = this.loadConversation();
-    if (memory?.messages) {
-      memory.messages = memory.messages.map(msg => 
-        msg.id === messageId 
-          ? { ...msg, connections: [...(msg.connections || []), connectionData] }
-          : msg
-      );
-      this.saveConversation(memory.messages, memory.contextData);
+  updateMessageConnection(messageId: string, connection: any) {
+    // Сохраняем связь сообщения для обучения
+    const connections = this.getMessageConnections();
+    connections[messageId] = connection;
+    localStorage.setItem('anyuta_message_connections', JSON.stringify(connections));
+  }
+
+  private getMessageConnections(): Record<string, any> {
+    try {
+      const saved = localStorage.getItem('anyuta_message_connections');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
     }
   }
 }

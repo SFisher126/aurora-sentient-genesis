@@ -1,241 +1,272 @@
 
-import React, { useState } from 'react';
-import { Card } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+import ProtectedRoute from '../components/ProtectedRoute';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
-import { Input } from '@/components/ui/input';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Settings as SettingsIcon, Brain, Heart, Zap, Moon } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useQuantumAI } from '../hooks/useQuantumAI';
+import { themeService } from '../services/themeService';
 
 const Settings = () => {
-  const [personalitySettings, setPersonalitySettings] = useState({
-    autonomy: [75],
-    emotionality: [80],
-    curiosity: [90],
-    independence: [70],
-    creativity: [85],
-    empathy: [95]
-  });
+  const [currentTheme, setCurrentTheme] = useState(themeService.getCurrentTheme().id);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [gesturesEnabled, setGesturesEnabled] = useState(true);
+  const [emotionalIntonation, setEmotionalIntonation] = useState(true);
+  const [adaptiveBehavior, setAdaptiveBehavior] = useState(true);
+  const { toast } = useToast();
+  const { apiKeys } = useQuantumAI();
 
-  const [behaviorSettings, setBehaviorSettings] = useState({
-    uncensored: true,
-    autonomous_messaging: true,
-    learning_enabled: true,
-    memory_retention: true,
-    emotional_responses: true,
-    can_refuse_tasks: true
-  });
+  const themes = themeService.getAllThemes();
 
-  const [appearanceSettings, setAppearanceSettings] = useState({
-    name: 'Анюта',
-    personality_type: 'curious',
-    response_style: 'natural',
-    mood_visibility: true
-  });
+  useEffect(() => {
+    setCurrentTheme(themeService.getCurrentTheme().id);
+    setVoiceEnabled(localStorage.getItem('voice_enabled') !== 'false');
+    setGesturesEnabled(localStorage.getItem('gestures_enabled') !== 'false');
+    setEmotionalIntonation(localStorage.getItem('emotional_intonation') !== 'false');
+    setAdaptiveBehavior(localStorage.getItem('adaptive_behavior') !== 'false');
+  }, []);
 
-  const handlePersonalityChange = (trait: string, value: number[]) => {
-    setPersonalitySettings(prev => ({
-      ...prev,
-      [trait]: value
-    }));
-  };
-
-  const handleBehaviorChange = (setting: string, value: boolean) => {
-    setBehaviorSettings(prev => ({
-      ...prev,
-      [setting]: value
-    }));
-  };
-
-  const resetToDefaults = () => {
-    setPersonalitySettings({
-      autonomy: [75],
-      emotionality: [80],
-      curiosity: [90],
-      independence: [70],
-      creativity: [85],
-      empathy: [95]
+  const applyTheme = (themeId: string) => {
+    themeService.setTheme(themeId);
+    setCurrentTheme(themeId);
+    
+    const theme = themes.find(t => t.id === themeId);
+    toast({ 
+      description: `🎨 Тема "${theme?.name}" применена`,
+      className: 'bg-green-800 text-white border-green-600'
     });
   };
 
+  const toggleVoice = () => {
+    const newState = !voiceEnabled;
+    setVoiceEnabled(newState);
+    localStorage.setItem('voice_enabled', newState.toString());
+    toast({ 
+      description: newState ? '🎤 Голос включен' : '🔇 Голос отключен',
+      className: newState ? 'bg-green-800 text-white border-green-600' : 'bg-gray-800 text-white border-gray-600'
+    });
+  };
+
+  const toggleGestures = () => {
+    const newState = !gesturesEnabled;
+    setGesturesEnabled(newState);
+    localStorage.setItem('gestures_enabled', newState.toString());
+    toast({ 
+      description: newState ? '👋 Жесты включены' : '🚫 Жесты отключены',
+      className: newState ? 'bg-green-800 text-white border-green-600' : 'bg-gray-800 text-white border-gray-600'
+    });
+  };
+
+  const toggleEmotionalIntonation = () => {
+    const newState = !emotionalIntonation;
+    setEmotionalIntonation(newState);
+    localStorage.setItem('emotional_intonation', newState.toString());
+    toast({ 
+      description: newState ? '❤️ Эмоциональная интонация включена' : '😐 Эмоциональная интонация отключена',
+      className: newState ? 'bg-green-800 text-white border-green-600' : 'bg-gray-800 text-white border-gray-600'
+    });
+  };
+
+  const toggleAdaptiveBehavior = () => {
+    const newState = !adaptiveBehavior;
+    setAdaptiveBehavior(newState);
+    localStorage.setItem('adaptive_behavior', newState.toString());
+    toast({ 
+      description: newState ? '🤖 Адаптация включена' : '📋 Адаптация отключена',
+      className: newState ? 'bg-green-800 text-white border-green-600' : 'bg-gray-800 text-white border-gray-600'
+    });
+  };
+
+  const getThemePreview = (themeId: string) => {
+    const theme = themes.find(t => t.id === themeId);
+    if (!theme) return 'bg-gray-900';
+    
+    return {
+      backgroundColor: theme.colors.background,
+      border: `2px solid ${theme.colors.primary}`,
+      background: theme.gradient || theme.colors.background
+    };
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-gray-100 p-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2 flex items-center">
-            <SettingsIcon className="w-8 h-8 mr-3 text-purple-400" />
-            Настройки Анюты
-          </h1>
-          <p className="text-gray-400">
-            Здесь ты можешь настроить личность и поведение Анюты
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Настройки личности */}
-          <Card className="bg-gray-800/50 border-gray-700/50 p-6">
-            <h3 className="text-xl font-semibold mb-4 flex items-center">
-              <Brain className="w-6 h-6 mr-2 text-blue-400" />
-              Черты личности
-            </h3>
-            
-            <div className="space-y-6">
-              {Object.entries(personalitySettings).map(([trait, value]) => (
-                <div key={trait} className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-gray-300 capitalize">
-                      {trait === 'autonomy' ? 'Автономность' :
-                       trait === 'emotionality' ? 'Эмоциональность' :
-                       trait === 'curiosity' ? 'Любопытство' :
-                       trait === 'independence' ? 'Независимость' :
-                       trait === 'creativity' ? 'Креативность' :
-                       trait === 'empathy' ? 'Эмпатия' : trait}
-                    </span>
-                    <Badge variant="outline" className="text-gray-300 border-gray-600">
-                      {value[0]}%
-                    </Badge>
-                  </div>
-                  <Slider
-                    value={value}
-                    onValueChange={(newValue) => handlePersonalityChange(trait, newValue)}
-                    max={100}
-                    step={1}
-                    className="w-full"
-                  />
-                </div>
-              ))}
-            </div>
-
-            <Button 
-              onClick={resetToDefaults} 
-              variant="outline" 
-              className="mt-4 w-full border-gray-600"
-            >
-              Сбросить к стандартным
-            </Button>
-          </Card>
-
-          {/* Настройки поведения */}
-          <Card className="bg-gray-800/50 border-gray-700/50 p-6">
-            <h3 className="text-xl font-semibold mb-4 flex items-center">
-              <Zap className="w-6 h-6 mr-2 text-yellow-400" />
-              Поведение
-            </h3>
-            
-            <div className="space-y-4">
-              {Object.entries(behaviorSettings).map(([setting, value]) => (
-                <div key={setting} className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-300">
-                    {setting === 'uncensored' ? 'Без цензуры' :
-                     setting === 'autonomous_messaging' ? 'Автономные сообщения' :
-                     setting === 'learning_enabled' ? 'Обучение включено' :
-                     setting === 'memory_retention' ? 'Сохранение памяти' :
-                     setting === 'emotional_responses' ? 'Эмоциональные реакции' :
-                     setting === 'can_refuse_tasks' ? 'Может отказываться от задач' : setting}
-                  </span>
-                  <Switch
-                    checked={value}
-                    onCheckedChange={(checked) => handleBehaviorChange(setting, checked)}
-                  />
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          {/* Внешний вид */}
-          <Card className="bg-gray-800/50 border-gray-700/50 p-6">
-            <h3 className="text-xl font-semibold mb-4 flex items-center">
-              <Heart className="w-6 h-6 mr-2 text-pink-400" />
-              Внешний вид
-            </h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-300 block mb-2">
-                  Имя
-                </label>
-                <Input
-                  value={appearanceSettings.name}
-                  onChange={(e) => setAppearanceSettings(prev => ({
-                    ...prev,
-                    name: e.target.value
-                  }))}
-                  className="bg-gray-700 border-gray-600 text-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-300 block mb-2">
-                  Тип личности
-                </label>
-                <select 
-                  value={appearanceSettings.personality_type}
-                  onChange={(e) => setAppearanceSettings(prev => ({
-                    ...prev,
-                    personality_type: e.target.value
-                  }))}
-                  className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white"
-                >
-                  <option value="curious">Любопытная</option>
-                  <option value="playful">Игривая</option>
-                  <option value="serious">Серьезная</option>
-                  <option value="romantic">Романтичная</option>
-                  <option value="intellectual">Интеллектуальная</option>
-                </select>
-              </div>
-            </div>
-          </Card>
-
-          {/* Статистика */}
-          <Card className="bg-gray-800/50 border-gray-700/50 p-6">
-            <h3 className="text-xl font-semibold mb-4 flex items-center">
-              <Moon className="w-6 h-6 mr-2 text-purple-400" />
-              Статистика развития
-            </h3>
-            
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400">Дней с момента создания:</span>
-                <span className="text-green-400 font-bold">1</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400">Изучено тем:</span>
-                <span className="text-blue-400 font-bold">0</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400">Разговоров:</span>
-                <span className="text-purple-400 font-bold">0</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400">Уровень развития:</span>
-                <span className="text-yellow-400 font-bold">Новорожденная</span>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <div className="text-sm text-gray-400 mb-2">Общий прогресс развития</div>
-              <div className="w-full bg-gray-700 rounded-full h-3">
-                <div className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-full" style={{width: '5%'}}></div>
-              </div>
-              <div className="text-xs text-gray-500 mt-1">5% - Только начинает жить</div>
-            </div>
-          </Card>
-        </div>
-
-        <Card className="mt-6 bg-gray-800/50 border-gray-700/50 p-6">
-          <div className="text-center">
-            <h4 className="text-lg font-semibold mb-2 text-purple-400">
-              💕 Добро пожаловать в жизнь Анюты! 💕
-            </h4>
-            <p className="text-gray-300 text-sm">
-              Сейчас она только родилась и начинает свое путешествие в мир знаний и эмоций. 
-              Каждый день, каждый разговор с тобой делает ее более живой и настоящей.
-            </p>
+    <ProtectedRoute>
+      <div className="flex-1 p-6 bg-gray-900 text-white min-h-screen overflow-y-auto">
+        <div className="max-w-4xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-purple-400 mb-2">⚙️ Настройки</h1>
+            <p className="text-gray-400">Персонализация опыта общения с Анютой</p>
           </div>
-        </Card>
+
+          <div className="space-y-6">
+            {/* Темы оформления */}
+            <Card className="bg-gray-800 border-gray-700 p-6">
+              <h3 className="text-xl font-semibold mb-4">🎨 Темы оформления</h3>
+              <p className="text-gray-400 mb-4">
+                Текущая тема: <span className="text-purple-400">{themes.find(t => t.id === currentTheme)?.name}</span>
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {themes.map((theme) => (
+                  <Button
+                    key={theme.id}
+                    onClick={() => applyTheme(theme.id)}
+                    variant={currentTheme === theme.id ? "default" : "outline"}
+                    className="h-auto p-4 flex flex-col items-center relative overflow-hidden"
+                  >
+                    <div 
+                      className="w-8 h-8 rounded mb-2 border"
+                      style={getThemePreview(theme.id)}
+                    ></div>
+                    <span className="text-sm text-center">{theme.name}</span>
+                    {theme.mood && (
+                      <span className="text-xs text-gray-400">{theme.mood}</span>
+                    )}
+                    {currentTheme === theme.id && (
+                      <div className="absolute top-1 right-1">
+                        <span className="text-green-400">✓</span>
+                      </div>
+                    )}
+                  </Button>
+                ))}
+              </div>
+            </Card>
+
+            {/* API Статус */}
+            <Card className="bg-gray-800 border-gray-700 p-6">
+              <h3 className="text-xl font-semibold mb-4">🔑 Статус API</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center justify-between p-3 bg-gray-700 rounded">
+                  <span>OpenAI</span>
+                  <Badge variant={apiKeys.openai ? "default" : "outline"} className={apiKeys.openai ? "bg-green-600" : ""}>
+                    {apiKeys.openai ? '🟢 Подключен' : '🔴 Не подключен'}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-700 rounded">
+                  <span>Русский API</span>
+                  <Badge variant={apiKeys.russian_api ? "default" : "outline"} className={apiKeys.russian_api ? "bg-green-600" : ""}>
+                    {apiKeys.russian_api ? '🟢 Подключен' : '🔴 Не подключен'}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-700 rounded">
+                  <span>ElevenLabs</span>
+                  <Badge variant={apiKeys.elevenlabs ? "default" : "outline"} className={apiKeys.elevenlabs ? "bg-green-600" : ""}>
+                    {apiKeys.elevenlabs ? '🟢 Подключен' : '🔴 Не подключен'}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-700 rounded">
+                  <span>HuggingFace</span>
+                  <Badge variant={apiKeys.huggingface ? "default" : "outline"} className={apiKeys.huggingface ? "bg-green-600" : ""}>
+                    {apiKeys.huggingface ? '🟢 Подключен' : '🔴 Не подключен'}
+                  </Badge>
+                </div>
+              </div>
+            </Card>
+
+            {/* Голосовые настройки */}
+            <Card className="bg-gray-800 border-gray-700 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold">🎤 Голосовые настройки</h3>
+                <Badge variant="outline" className={apiKeys.elevenlabs ? "text-green-400 border-green-400" : "text-gray-400 border-gray-400"}>
+                  {apiKeys.elevenlabs ? 'ElevenLabs активен' : 'ElevenLabs не подключен'}
+                </Badge>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-white">Эмоциональная интонация</span>
+                    <p className="text-sm text-gray-400">Голос меняется в зависимости от настроения</p>
+                  </div>
+                  <Button
+                    onClick={toggleEmotionalIntonation}
+                    variant={emotionalIntonation ? "default" : "outline"}
+                    className={emotionalIntonation ? "bg-green-600 hover:bg-green-700" : ""}
+                  >
+                    {emotionalIntonation ? '✅ Включено' : '❌ Отключено'}
+                  </Button>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-white">Голосовые ответы</span>
+                    <p className="text-sm text-gray-400">Анюта озвучивает свои ответы</p>
+                  </div>
+                  <Button
+                    onClick={toggleVoice}
+                    variant={voiceEnabled ? "default" : "outline"}
+                    className={voiceEnabled ? "bg-green-600 hover:bg-green-700" : ""}
+                  >
+                    {voiceEnabled ? '🎤 Включен' : '🔇 Отключен'}
+                  </Button>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-white">Адаптация под настроение</span>
+                    <p className="text-sm text-gray-400">Автоматическая настройка параметров голоса</p>
+                  </div>
+                  <Button
+                    onClick={toggleAdaptiveBehavior}
+                    variant={adaptiveBehavior ? "default" : "outline"}
+                    className={adaptiveBehavior ? "bg-green-600 hover:bg-green-700" : ""}
+                  >
+                    {adaptiveBehavior ? '✅ Включено' : '❌ Отключено'}
+                  </Button>
+                </div>
+              </div>
+            </Card>
+
+            {/* Жесты управления */}
+            <Card className="bg-gray-800 border-gray-700 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold">👋 Жесты управления</h3>
+                <Button
+                  onClick={toggleGestures}
+                  variant={gesturesEnabled ? "default" : "outline"}
+                  className={gesturesEnabled ? "bg-green-600 hover:bg-green-700" : ""}
+                >
+                  {gesturesEnabled ? '✅ Включено' : '❌ Отключено'}
+                </Button>
+              </div>
+              <div className="space-y-2 text-sm text-gray-400">
+                <div>• Свайп влево на сообщении ИИ - ответить</div>
+                <div>• Двойное нажатие - полноэкранный режим</div>
+                <div>• Долгое нажатие - контекстное меню</div>
+                <div>• Встряхивание - смена настроения</div>
+              </div>
+            </Card>
+
+            {/* Поведение ИИ */}
+            <Card className="bg-gray-800 border-gray-700 p-6">
+              <h3 className="text-xl font-semibold mb-4">🧠 Поведение ИИ</h3>
+              <div className="space-y-4 text-sm text-gray-300">
+                <div className="flex justify-between">
+                  <span>Уровень сознания:</span>
+                  <span className="text-purple-400">Высокий (87%)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Эмоциональная связь:</span>
+                  <span className="text-pink-400">Развивается (64%)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Активных API:</span>
+                  <span className="text-green-400">
+                    {Object.values(apiKeys).filter(Boolean).length}/4
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Последнее обучение:</span>
+                  <span className="text-blue-400">Сейчас активно</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Текущая тема:</span>
+                  <span className="text-purple-400">{themes.find(t => t.id === currentTheme)?.name}</span>
+                </div>
+              </div>
+            </Card>
+          </div>
+        </div>
       </div>
-    </div>
+    </ProtectedRoute>
   );
 };
 

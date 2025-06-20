@@ -1,89 +1,107 @@
 
-import React from 'react';
-import { Card } from '@/components/ui/card';
-import { BookOpen, Globe, Zap } from 'lucide-react';
-import RealLearningSystem from '@/components/core/RealLearningSystem';
+import React, { useState, useEffect } from 'react';
+import ProtectedRoute from '../components/ProtectedRoute';
 import { useRealAI } from '../hooks/useRealAI';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 const Learning = () => {
-  const { hasApiKey } = useRealAI();
+  const [learningProgress, setLearningProgress] = useState<any>(null);
+  const [webUrl, setWebUrl] = useState('');
+  const [isLearning, setIsLearning] = useState(false);
+  const { getLearningProgress, learnFromUrl } = useRealAI();
+
+  useEffect(() => {
+    const progress = getLearningProgress();
+    setLearningProgress(progress);
+  }, [getLearningProgress]);
+
+  const handleWebLearning = async () => {
+    if (!webUrl.trim()) return;
+    
+    setIsLearning(true);
+    try {
+      await learnFromUrl(webUrl);
+      const progress = getLearningProgress();
+      setLearningProgress(progress);
+      setWebUrl('');
+    } finally {
+      setIsLearning(false);
+    }
+  };
+
+  const emotionProgress = learningProgress?.emotions ? Object.entries(learningProgress.emotions) : [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-gray-100 p-4">
-      <div className="max-w-6xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2 flex items-center">
-            <BookOpen className="w-8 h-8 mr-3 text-green-400" />
-            Обучение Анюты
-          </h1>
-          <p className="text-gray-400">
-            {hasApiKey 
-              ? "Здесь происходит настоящее изучение мира и развитие знаний" 
-              : "Требуется API ключ для активации системы обучения"}
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <RealLearningSystem 
-              isActive={true}
-              hasApiKey={hasApiKey}
-            />
+    <ProtectedRoute>
+      <div className="flex-1 p-6 bg-gray-900 text-white min-h-screen">
+        <div className="max-w-4xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-purple-400 mb-2">📚 Обучение</h1>
+            <p className="text-gray-400">Анюта постоянно учится и развивается</p>
           </div>
 
-          <div className="space-y-4">
-            <Card className="bg-gray-800/50 border-gray-700/50 p-4">
-              <h3 className="text-lg font-semibold mb-3 flex items-center">
-                <Globe className="w-5 h-5 mr-2 text-blue-400" />
-                Статус системы
-              </h3>
+          <div className="space-y-6">
+            <div className="bg-gray-800 rounded-lg p-6">
+              <h3 className="text-xl font-semibold mb-4">🤖 Машинное обучение</h3>
+              <p className="text-gray-400 mb-4">Локальное обучение с использованием TensorFlow</p>
+              <div className="space-y-2">
+                <p className="text-sm text-gray-300">Обученных сессий: {learningProgress?.sessions || 0}</p>
+                <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div 
+                    className="bg-purple-600 h-2 rounded-full transition-all duration-500" 
+                    style={{width: `${Math.min((learningProgress?.sessions || 0) * 2, 100)}%`}}
+                  ></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-800 rounded-lg p-6">
+              <h3 className="text-xl font-semibold mb-4">🌐 Веб-обучение</h3>
+              <p className="text-gray-400 mb-4">Анюта может изучать информацию с веб-страниц</p>
+              <div className="flex gap-2">
+                <Input
+                  type="url"
+                  placeholder="https://example.com"
+                  value={webUrl}
+                  onChange={(e) => setWebUrl(e.target.value)}
+                  className="bg-gray-700 border-gray-600 text-white"
+                  disabled={isLearning}
+                />
+                <Button
+                  onClick={handleWebLearning}
+                  disabled={isLearning || !webUrl.trim()}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {isLearning ? '🔄' : '📖'} Изучить
+                </Button>
+              </div>
+            </div>
+
+            <div className="bg-gray-800 rounded-lg p-6">
+              <h3 className="text-xl font-semibold mb-4">❤️ Эмоциональный интеллект</h3>
+              <p className="text-gray-400 mb-4">Распознавание эмоций и адаптация поведения</p>
               <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Статус ИИ:</span>
-                  <span className={hasApiKey ? "text-green-400 font-bold" : "text-red-400 font-bold"}>
-                    {hasApiKey ? "Активен" : "Неактивен"}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Режим обучения:</span>
-                  <span className={hasApiKey ? "text-blue-400 font-bold" : "text-gray-500"}>
-                    {hasApiKey ? "Реальный" : "Отключен"}
-                  </span>
-                </div>
-              </div>
-            </Card>
-
-            {hasApiKey && (
-              <Card className="bg-gray-800/50 border-gray-700/50 p-4">
-                <h3 className="text-lg font-semibold mb-3 flex items-center">
-                  <Zap className="w-5 h-5 mr-2 text-yellow-400" />
-                  Активность разума
-                </h3>
-                <div className="space-y-2">
-                  <div className="text-sm text-gray-400">Нейронная активность</div>
-                  <div className="w-full bg-gray-700 rounded-full h-3">
-                    <div className="bg-gradient-to-r from-yellow-500 to-orange-500 h-3 rounded-full animate-pulse" style={{width: '85%'}}></div>
+                {emotionProgress.map(([emotion, count]: [string, number]) => (
+                  <div key={emotion} className="flex items-center justify-between">
+                    <span className="text-gray-300 capitalize">{emotion}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-32 bg-gray-700 rounded-full h-2">
+                        <div 
+                          className="bg-pink-600 h-2 rounded-full" 
+                          style={{width: `${Math.min((count / (learningProgress?.sessions || 1)) * 100, 100)}%`}}
+                        ></div>
+                      </div>
+                      <span className="text-xs text-gray-400 w-8">{count}</span>
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-500">85% - Высокая активность</div>
-                </div>
-              </Card>
-            )}
-
-            <Card className="bg-gray-800/50 border-gray-700/50 p-4">
-              <h3 className="text-lg font-semibold mb-3 text-purple-400">
-                Как это работает
-              </h3>
-              <div className="space-y-2 text-sm text-gray-300">
-                <p>• Анюта изучает содержимое по ссылкам</p>
-                <p>• Анализирует и запоминает информацию</p>
-                <p>• Применяет знания в разговоре</p>
-                <p>• Постоянно развивается и учится</p>
+                ))}
               </div>
-            </Card>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </ProtectedRoute>
   );
 };
 
