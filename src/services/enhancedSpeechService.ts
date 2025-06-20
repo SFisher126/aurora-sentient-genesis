@@ -1,250 +1,90 @@
 
-interface VoiceConfig {
-  rate: number;
-  pitch: number;
-  volume: number;
-  voiceIndex: number;
-}
-
 class EnhancedSpeechService {
   private synthesis: SpeechSynthesis;
-  private recognition: any;
-  private isSupported: boolean;
-  private voices: SpeechSynthesisVoice[] = [];
-  private config: VoiceConfig = {
-    rate: 0.95,
-    pitch: 1.1,
-    volume: 0.9,
-    voiceIndex: -1
-  };
-  private isSpeaking: boolean = false;
-  private isListening: boolean = false;
-  private recognitionStarted: boolean = false;
+  private elevenLabsApiKey = 'sk_812f7d7ea6623a533ddab8b7d39cfe44fbe2243dd83d1268';
+  private isElevenLabsEnabled = true;
 
   constructor() {
     this.synthesis = window.speechSynthesis;
-    this.isSupported = 'speechSynthesis' in window;
-    
-    if (this.isSupported) {
-      this.loadVoices();
-      this.synthesis.addEventListener('voiceschanged', () => {
-        this.loadVoices();
-      });
-    }
-
-    this.initializeSpeechRecognition();
   }
 
-  private loadVoices() {
-    this.voices = this.synthesis.getVoices();
-    console.log('🎤 Available voices loaded:', this.voices.length);
-    
-    // Ищем лучший русский женский голос для Анюты
-    const russianVoices = this.voices.filter(voice => 
-      voice.lang.includes('ru') || voice.lang.includes('RU')
-    );
-    
-    if (russianVoices.length > 0) {
-      const femaleVoice = russianVoices.find(voice => 
-        voice.name.toLowerCase().includes('anna') ||
-        voice.name.toLowerCase().includes('alena') ||
-        voice.name.toLowerCase().includes('female') ||
-        voice.name.toLowerCase().includes('woman') ||
-        voice.name.toLowerCase().includes('maria')
-      );
-      
-      if (femaleVoice) {
-        this.config.voiceIndex = this.voices.indexOf(femaleVoice);
-        console.log('👩 Selected voice for Anuta:', femaleVoice.name);
-      }
-    }
-  }
-
-  private initializeSpeechRecognition() {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-      this.recognition = new SpeechRecognition();
-      
-      this.recognition.continuous = false;
-      this.recognition.interimResults = true;
-      this.recognition.lang = 'ru-RU';
-      this.recognition.maxAlternatives = 1;
-      
-      console.log('🎙️ Speech recognition initialized');
-    } else {
-      console.warn('Speech recognition not supported');
-    }
-  }
-
-  async speak(text: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!this.isSupported) {
-        console.warn('Speech synthesis not supported');
-        resolve();
-        return;
-      }
-
-      // Останавливаем текущую речь
-      this.synthesis.cancel();
-
-      const utterance = new SpeechSynthesisUtterance(text);
-      
-      // Настройки голоса для Анюты
-      if (this.config.voiceIndex >= 0 && this.voices[this.config.voiceIndex]) {
-        utterance.voice = this.voices[this.config.voiceIndex];
-      }
-      
-      utterance.rate = this.config.rate;
-      utterance.pitch = this.config.pitch;
-      utterance.volume = this.config.volume;
-
-      // Эмоциональность в речи
-      if (text.includes('!') || text.includes('💕')) {
-        utterance.rate = Math.min(1.1, utterance.rate * 1.05);
-        utterance.pitch = Math.min(2.0, utterance.pitch * 1.05);
-      }
-      
-      if (text.includes('...') || text.includes('думаю')) {
-        utterance.rate = Math.max(0.8, utterance.rate * 0.95);
-      }
-
-      utterance.onstart = () => {
-        this.isSpeaking = true;
-        console.log('🗣️ Anuta started speaking:', text.slice(0, 50));
-      };
-
-      utterance.onend = () => {
-        this.isSpeaking = false;
-        console.log('🤐 Anuta finished speaking');
-        resolve();
-      };
-
-      utterance.onerror = (error) => {
-        this.isSpeaking = false;
-        console.error('Speech error:', error);
-        resolve(); // Не отклоняем, чтобы не ломать поток
-      };
-
-      this.synthesis.speak(utterance);
-    });
-  }
-
-  startListening(onResult: (text: string) => void, onError?: (error: any) => void): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!this.recognition) {
-        const error = 'Speech recognition not available';
-        console.warn(error);
-        onError?.(error);
-        reject(error);
-        return;
-      }
-
-      // Исправление: проверяем состояние перед запуском
-      if (this.isListening || this.recognitionStarted) {
-        console.log('Recognition already running, stopping first...');
-        this.stopListening();
-        // Даем время на завершение
-        setTimeout(() => {
-          this.startListeningInternal(onResult, onError, resolve, reject);
-        }, 100);
-        return;
-      }
-
-      this.startListeningInternal(onResult, onError, resolve, reject);
-    });
-  }
-
-  private startListeningInternal(onResult: (text: string) => void, onError?: (error: any) => void, resolve?: () => void, reject?: (error: any) => void) {
-    this.recognition.onstart = () => {
-      this.isListening = true;
-      this.recognitionStarted = true;
-      console.log('🎙️ Started listening...');
-      resolve?.();
-    };
-
-    this.recognition.onresult = (event: any) => {
-      let finalTranscript = '';
-      let interimTranscript = '';
-
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          finalTranscript += transcript;
-        } else {
-          interimTranscript += transcript;
-        }
-      }
-
-      if (finalTranscript) {
-        console.log('🎤 User said:', finalTranscript);
-        onResult(finalTranscript);
-      }
-    };
-
-    this.recognition.onerror = (event: any) => {
-      console.error('Speech recognition error:', event.error);
-      this.isListening = false;
-      this.recognitionStarted = false;
-      
-      // Игнорируем ошибку "already started"
-      if (event.error !== 'already-started') {
-        onError?.(event.error);
-      }
-    };
-
-    this.recognition.onend = () => {
-      this.isListening = false;
-      this.recognitionStarted = false;
-      console.log('🔇 Stopped listening');
-    };
-
-    try {
-      this.recognition.start();
-    } catch (error) {
-      console.error('Failed to start recognition:', error);
-      this.isListening = false;
-      this.recognitionStarted = false;
-      onError?.(error);
-      reject?.(error);
-    }
-  }
-
-  stopListening() {
-    if (this.recognition && (this.isListening || this.recognitionStarted)) {
+  async speak(text: string, emotion: string = 'neutral'): Promise<void> {
+    if (this.isElevenLabsEnabled && this.elevenLabsApiKey) {
       try {
-        this.recognition.stop();
+        await this.speakWithElevenLabs(text, emotion);
+        return;
       } catch (error) {
-        console.error('Error stopping recognition:', error);
+        console.error('ElevenLabs error, falling back to browser TTS:', error);
       }
-      this.isListening = false;
-      this.recognitionStarted = false;
-      console.log('🔇 Manually stopped listening');
     }
+    
+    // Fallback to browser speech
+    this.speakWithBrowser(text);
   }
 
-  stop() {
-    if (this.isSupported) {
-      this.synthesis.cancel();
-      this.isSpeaking = false;
+  private async speakWithElevenLabs(text: string, emotion: string): Promise<void> {
+    const voiceId = '9BWtsMINqrJLrRacOk9x'; // Aria
+
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'audio/mpeg',
+        'Content-Type': 'application/json',
+        'xi-api-key': this.elevenLabsApiKey,
+      },
+      body: JSON.stringify({
+        text: text,
+        model_id: 'eleven_multilingual_v2',
+        voice_settings: {
+          stability: 0.75,
+          similarity_boost: 0.8,
+          style: 0.3,
+          use_speaker_boost: true
+        }
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`ElevenLabs API error: ${response.status}`);
     }
-    this.stopListening();
+
+    const audioBlob = await response.blob();
+    const audioUrl = URL.createObjectURL(audioBlob);
+    const audio = new Audio(audioUrl);
+    
+    return new Promise((resolve, reject) => {
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        resolve();
+      };
+      audio.onerror = reject;
+      audio.play().catch(reject);
+    });
   }
 
-  getSpeakingState(): boolean {
-    return this.isSpeaking;
+  private speakWithBrowser(text: string): void {
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voices = this.synthesis.getVoices();
+    
+    // Ищем русский женский голос
+    const russianVoice = voices.find(voice => 
+      voice.lang.includes('ru') && 
+      (voice.name.includes('female') || voice.name.includes('Anna'))
+    ) || voices.find(voice => voice.lang.includes('ru'));
+    
+    if (russianVoice) {
+      utterance.voice = russianVoice;
+    }
+    
+    utterance.rate = 0.9;
+    utterance.pitch = 1.1;
+    utterance.volume = 0.8;
+    
+    this.synthesis.speak(utterance);
   }
 
-  getListeningState(): boolean {
-    return this.isListening;
-  }
-
-  getAvailableVoices(): SpeechSynthesisVoice[] {
-    return this.voices;
-  }
-
-  setVoiceConfig(config: Partial<VoiceConfig>) {
-    this.config = { ...this.config, ...config };
-    console.log('🎛️ Voice config updated:', this.config);
+  stop(): void {
+    this.synthesis.cancel();
   }
 }
 
