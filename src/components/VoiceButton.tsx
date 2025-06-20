@@ -15,53 +15,32 @@ const VoiceButton: React.FC<VoiceButtonProps> = ({ onVoiceMessage }) => {
   const [isLocked, setIsLocked] = useState(false);
   const [dragY, setDragY] = useState(0);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const recordingTimeoutRef = useRef<NodeJS.Timeout>();
   const { toast } = useToast();
 
-  const startRecording = async () => {
-    try {
-      setIsRecording(true);
-      setRecordedText('');
-      
-      await enhancedSpeechService.startListening(
-        (text) => {
-          setRecordedText(text);
-        },
-        (error) => {
-          console.error('Voice error:', error);
-          setIsRecording(false);
-          setIsLocked(false);
-          if (error !== 'already-started') {
-            toast({ description: 'Ошибка записи голоса', variant: 'destructive' });
-          }
-        }
-      );
-
-      // Автоматическая остановка через 30 секунд
-      recordingTimeoutRef.current = setTimeout(() => {
-        if (isRecording && !isLocked) {
-          stopRecording();
-        }
-      }, 30000);
-
-    } catch (error) {
-      console.error('Failed to start recording:', error);
-      setIsRecording(false);
-      toast({ description: 'Не удалось начать запись', variant: 'destructive' });
-    }
+  const startRecording = () => {
+    setIsRecording(true);
+    setRecordedText('');
+    
+    enhancedSpeechService.startListening(
+      (text) => {
+        setRecordedText(text);
+      },
+      (error) => {
+        console.error('Voice error:', error);
+        setIsRecording(false);
+        setIsLocked(false);
+        toast({ description: 'Ошибка записи голоса', variant: 'destructive' });
+      }
+    );
   };
 
   const stopRecording = () => {
-    if (recordingTimeoutRef.current) {
-      clearTimeout(recordingTimeoutRef.current);
-    }
-
     enhancedSpeechService.stopListening();
     setIsRecording(false);
     
     if (recordedText.trim()) {
       onVoiceMessage(recordedText);
-      toast({ description: `Отправлено: "${recordedText.slice(0, 50)}${recordedText.length > 50 ? '...' : ''}"` });
+      toast({ description: `Отправлено: "${recordedText}"` });
     }
     
     setRecordedText('');
@@ -70,25 +49,21 @@ const VoiceButton: React.FC<VoiceButtonProps> = ({ onVoiceMessage }) => {
   };
 
   const handleMouseDown = () => {
-    if (!isRecording) {
-      startRecording();
-    }
+    startRecording();
   };
 
   const handleMouseUp = () => {
-    if (isRecording && !isLocked) {
+    if (!isLocked) {
       stopRecording();
     }
   };
 
   const handleTouchStart = () => {
-    if (!isRecording) {
-      startRecording();
-    }
+    startRecording();
   };
 
   const handleTouchEnd = () => {
-    if (isRecording && !isLocked) {
+    if (!isLocked) {
       stopRecording();
     }
   };
@@ -104,7 +79,7 @@ const VoiceButton: React.FC<VoiceButtonProps> = ({ onVoiceMessage }) => {
       setDragY(deltaY);
       
       // Блокируем запись при движении вверх на 50px
-      if (deltaY > 50 && !isLocked) {
+      if (deltaY > 50) {
         setIsLocked(true);
         toast({ description: 'Запись заблокирована. Нажмите "Отправить" чтобы завершить.' });
       }
@@ -115,13 +90,12 @@ const VoiceButton: React.FC<VoiceButtonProps> = ({ onVoiceMessage }) => {
     stopRecording();
   };
 
-  // Режим заблокированной записи
   if (isLocked) {
     return (
       <div className="flex items-center gap-2">
-        <div className="flex items-center bg-gray-700 rounded-full px-3 py-2 max-w-xs">
+        <div className="flex items-center bg-gray-700 rounded-full px-3 py-2">
           <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse mr-2"></div>
-          <span className="text-sm text-gray-300 truncate">
+          <span className="text-sm text-gray-300">
             {recordedText || 'Говорите...'}
           </span>
         </div>
@@ -140,7 +114,6 @@ const VoiceButton: React.FC<VoiceButtonProps> = ({ onVoiceMessage }) => {
       ref={buttonRef}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp} // Останавливаем если мышь ушла с кнопки
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchMove={handleTouchMove}
