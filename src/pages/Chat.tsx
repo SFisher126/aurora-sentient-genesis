@@ -53,7 +53,6 @@ const Chat = () => {
     isThinking, 
     setOpenAIKey,
     setRussianAPIKey,
-    setElevenLabsKey,
     hasActiveAPI,
     context
   } = useQuantumAI();
@@ -156,7 +155,9 @@ const Chat = () => {
     try {
       console.log('🧠 Отправляю сообщение в квантовый ИИ...');
       
+      // Формируем контекст
       let contextMessage = textToSend;
+      
       if (replyToMessage) {
         contextMessage = `Отвечаю на сообщение "${replyToMessage.text}": ${textToSend}`;
       }
@@ -184,9 +185,8 @@ const Chat = () => {
         memoryService.saveUserFact(textToSend, 'personal');
       }
       
-      // Озвучиваем ответ если включен голос
-      const voiceEnabled = localStorage.getItem('voice_enabled') !== 'false';
-      if (response.text && voiceEnabled) {
+      // Озвучиваем ответ
+      if (response.text) {
         try {
           await enhancedSpeechService.speak(response.text, response.emotion);
         } catch (error) {
@@ -198,7 +198,7 @@ const Chat = () => {
       console.error('Ошибка генерации ответа:', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: "Прости, у меня проблемы с мышлением... Но я все равно учусь! Проверь API ключи в настройках 💭",
+        text: "Прости, у меня проблемы с мышлением... Но я все равно учусь! Попробуй добавить API ключ для лучшей работы 💭",
         sender: 'ai',
         timestamp: new Date(),
         emotion: 'confused'
@@ -332,16 +332,6 @@ const Chat = () => {
         
         <p className="text-sm whitespace-pre-line">{message.text}</p>
         
-        {/* Показываем мысли ИИ */}
-        {message.thoughts && message.thoughts.length > 0 && (
-          <div className="mt-2 p-2 bg-black/10 rounded text-xs opacity-70">
-            <div className="text-purple-300">💭 Мысли:</div>
-            {message.thoughts.slice(0, 2).map((thought, idx) => (
-              <div key={idx} className="text-purple-200">• {thought}</div>
-            ))}
-          </div>
-        )}
-        
         <div className="flex items-center justify-between mt-2">
           <span className="text-xs opacity-70">
             {message.timestamp.toLocaleTimeString()}
@@ -464,10 +454,7 @@ const Chat = () => {
                   </div>
                   <p className="text-gray-500">Начните диалог с Анютой...</p>
                   {hasActiveAPI && (
-                    <div className="mt-4 space-y-1">
-                      <p className="text-green-400 text-sm">✨ Квантовый ИИ готов к мышлению</p>
-                      <p className="text-purple-400 text-xs">💭 Мысли и эмоции в реальном времени</p>
-                    </div>
+                    <p className="text-green-400 text-sm mt-2">✨ Квантовый ИИ готов к мышлению</p>
                   )}
                 </div>
               </div>

@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { quantumAIService } from '../services/quantumAIService';
 import { apiKeyService } from '../services/apiKeyService';
 
@@ -19,29 +19,11 @@ interface UseQuantumAIReturn {
   };
   setOpenAIKey: (key: string) => void;
   setRussianAPIKey: (key: string) => void;
-  setElevenLabsKey: (key: string) => void;
   hasActiveAPI: boolean;
-  apiKeys: {
-    openai: string;
-    russian_api: string;
-    elevenlabs: string;
-    huggingface: string;
-  };
 }
 
 export const useQuantumAI = (): UseQuantumAIReturn => {
   const [isThinking, setIsThinking] = useState(false);
-  const [hasActiveAPI, setHasActiveAPI] = useState(apiKeyService.hasAnyKey());
-  const [apiKeys, setApiKeys] = useState(apiKeyService.getAllKeys());
-
-  useEffect(() => {
-    const unsubscribe = apiKeyService.addListener(() => {
-      setHasActiveAPI(apiKeyService.hasAnyKey());
-      setApiKeys(apiKeyService.getAllKeys());
-    });
-
-    return unsubscribe;
-  }, []);
 
   const generateResponse = useCallback(async (message: string, userId: string = 'default') => {
     setIsThinking(true);
@@ -77,10 +59,7 @@ export const useQuantumAI = (): UseQuantumAIReturn => {
     console.log('🔑 Русский API ключ установлен');
   }, []);
 
-  const setElevenLabsKey = useCallback((key: string) => {
-    apiKeyService.setElevenLabsKey(key);
-    console.log('🔑 ElevenLabs ключ установлен');
-  }, []);
+  const hasActiveAPI = apiKeyService.hasAnyKey();
 
   const context = {
     conversationHistory: [],
@@ -93,8 +72,6 @@ export const useQuantumAI = (): UseQuantumAIReturn => {
     context,
     setOpenAIKey,
     setRussianAPIKey,
-    setElevenLabsKey,
-    hasActiveAPI,
-    apiKeys
+    hasActiveAPI
   };
 };
