@@ -20,7 +20,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
   const [isCodeSent, setIsCodeSent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
-  const [sentCode, setSentCode] = useState<string>('');
   const { toast } = useToast();
 
   const handleGoogleLogin = async () => {
@@ -77,23 +76,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
       setIsLoading(true);
       setLoadingProvider('sms');
       await authService.sendSmsCode(phone);
-      
-      // Для демо показываем код (убрать в продакшн)
-      const demoCode = localStorage.getItem('demo_sms_code_' + phone);
-      if (demoCode) {
-        setSentCode(demoCode);
-        toast({ 
-          description: `📱 DEMO: Код ${demoCode} отправлен на ${phone}!`,
-          className: 'bg-blue-800 text-white border-blue-600'
-        });
-      } else {
-        toast({ 
-          description: '📱 Код отправлен на ваш телефон!',
-          className: 'bg-blue-800 text-white border-blue-600'
-        });
-      }
-      
       setIsCodeSent(true);
+      toast({ 
+        description: '📱 Код отправлен на ваш телефон!',
+        className: 'bg-blue-800 text-white border-blue-600'
+      });
     } catch (error) {
       toast({ description: 'Ошибка отправки кода', variant: 'destructive' });
     } finally {
@@ -200,15 +187,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
               <>
                 <div className="text-sm text-gray-400 text-center">
                   Код отправлен на {phone}
-                  {sentCode && (
-                    <div className="mt-2 p-2 bg-blue-900/50 rounded text-blue-300">
-                      DEMO код: {sentCode}
-                    </div>
-                  )}
                 </div>
                 <Input
                   type="text"
-                  placeholder="Введите код из SMS"
+                  placeholder="Введите код (для демо: 1234)"
                   value={smsCode}
                   onChange={(e) => setSmsCode(e.target.value)}
                   className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
@@ -231,7 +213,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
                   onClick={() => {
                     setIsCodeSent(false);
                     setSmsCode('');
-                    setSentCode('');
                   }}
                   variant="outline"
                   className="w-full border-gray-600 text-gray-300 hover:bg-gray-700"
