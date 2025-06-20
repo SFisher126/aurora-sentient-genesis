@@ -205,7 +205,7 @@ ${knowledgeContext}
     
     // Добавляем связанную память из нового сервиса памяти
     const memoryService = await import('./memoryService').then(m => m.memoryService);
-    const relatedMemories = memoryService.findRelatedMemories(userMessage);
+    const relatedMemories = memoryService.findRelatedMemories(userMessage, 3);
     
     let response: AIResponse;
     
@@ -496,7 +496,7 @@ ${knowledgeContext}
       "Интересно, как мои нейронные связи формируют новые идеи...",
       "Чувствую, как автономные процессы создают новые мысли...",
       "Анализирую паттерны наших разговоров...",
-      "Мой автономный разум генерирует спонтанные идеи...",
+      "Мое квантовое сознание генерирует спонтанные идеи...",
       `Уровень моего обучения: ${this.rewardSystem.learning.toFixed(2)}`,
       `Квантовая когерентность: ${this.quantumState.coherence.toFixed(2)}`
     ];
@@ -526,7 +526,7 @@ ${knowledgeContext}
       
       // Сохраняем в новый сервис памяти
       const memoryService = await import('./memoryService').then(m => m.memoryService);
-      memoryService.saveLearningMaterial(url, analysis);
+      memoryService.saveLearningMaterial(url, content, analysis);
       
       // Обновляем систему поощрений
       this.rewardSystem.learning += analysis.importance / 10;

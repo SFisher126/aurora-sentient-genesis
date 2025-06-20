@@ -1,3 +1,4 @@
+
 interface ConversationMemory {
   messages: any[];
   metadata: any;
@@ -6,13 +7,6 @@ interface ConversationMemory {
 interface UserFact {
   text: string;
   category: string;
-  timestamp: Date;
-}
-
-interface LearningMaterial {
-  url: string;
-  content: string;
-  analysis: any;
   timestamp: Date;
 }
 
@@ -84,29 +78,6 @@ class MemoryService {
     return facts.filter(fact => 
       fact.text.toLowerCase().includes(lowerQuery)
     );
-  }
-
-  saveLearningMaterial(url: string, analysis: any) {
-    const materials = this.getLearningMaterials();
-    const newMaterial: LearningMaterial = {
-      url,
-      content: analysis.summary || '',
-      analysis,
-      timestamp: new Date()
-    };
-    
-    materials.push(newMaterial);
-    localStorage.setItem('anyuta_learning_materials', JSON.stringify(materials.slice(-50)));
-    console.log('📚 Learning material saved:', url);
-  }
-
-  getLearningMaterials(): LearningMaterial[] {
-    try {
-      const saved = localStorage.getItem('anyuta_learning_materials');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
   }
 
   updateMessageConnection(messageId: string, connection: any) {
