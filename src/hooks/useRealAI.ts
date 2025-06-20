@@ -1,74 +1,84 @@
 
 import { useState, useCallback, useEffect } from 'react';
-import { realAIService } from '../services/realAIService';
+import { aiService } from '../services/aiService';
 
 interface UseRealAIReturn {
-  generateResponse: (message: string, userId?: string) => Promise<{ text: string; emotion: string; thoughts: string[] }>;
-  analyzeEmotion: (text: string) => Promise<string>;
+  generateResponse: (message: string) => Promise<any>;
+  generateAutonomousThought: () => Promise<string>;
   learnFromUrl: (url: string) => Promise<void>;
-  getPersonalMemory: (userId: string) => any;
-  getLearningProgress: () => any;
   isThinking: boolean;
+  setApiKey: (key: string) => void;
   setHuggingFaceKey: (key: string) => void;
+  setSelectedModel: (model: 'openai' | 'huggingface' | 'autonomous') => void;
   hasApiKey: boolean;
+  selectedModel: 'openai' | 'huggingface' | 'autonomous';
+  quantumState: any;
+  rewardSystem: any;
 }
 
 export const useRealAI = (): UseRealAIReturn => {
   const [isThinking, setIsThinking] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
-
-  const setHuggingFaceKey = useCallback((key: string) => {
-    // Сохраняем ключ в localStorage для демонстрации
-    localStorage.setItem('huggingface_key', key);
-    setHasApiKey(!!key);
-    console.log('🔑 HuggingFace API key установлен');
-  }, []);
+  const [selectedModel, setSelectedModelState] = useState<'openai' | 'huggingface' | 'autonomous'>('openai');
+  const [quantumState, setQuantumState] = useState(aiService.getQuantumState());
+  const [rewardSystem, setRewardSystem] = useState(aiService.getRewardSystem());
 
   useEffect(() => {
-    // Проверяем наличие сохраненного ключа
-    const savedKey = localStorage.getItem('huggingface_key');
-    setHasApiKey(!!savedKey);
+    aiService.loadFromStorage();
+    setHasApiKey(!!aiService.getApiKey());
+    setSelectedModelState(aiService.getSelectedModel());
+    updateStates();
   }, []);
 
-  const generateResponse = useCallback(async (message: string, userId: string = 'default') => {
+  const updateStates = () => {
+    setQuantumState(aiService.getQuantumState());
+    setRewardSystem(aiService.getRewardSystem());
+  };
+
+  const generateResponse = useCallback(async (message: string) => {
     setIsThinking(true);
     try {
-      const response = await realAIService.generateContextualResponse(message, userId);
-      // Возвращаем объект с нужными полями
-      return {
-        text: response,
-        emotion: 'curious',
-        thoughts: [`Анализирую сообщение: "${message}"`, 'Формирую персональный ответ', 'Учитываю контекст диалога']
-      };
+      const response = await aiService.generateResponse(message);
+      updateStates();
+      return response;
     } finally {
       setIsThinking(false);
     }
   }, []);
 
-  const analyzeEmotion = useCallback(async (text: string) => {
-    return await realAIService.analyzeEmotion(text);
+  const generateAutonomousThought = useCallback(async () => {
+    return await aiService.generateAutonomousThought();
   }, []);
 
   const learnFromUrl = useCallback(async (url: string) => {
-    return await realAIService.webScrapeAndLearn(url);
+    return await aiService.learnFromUrl(url);
   }, []);
 
-  const getPersonalMemory = useCallback((userId: string) => {
-    return realAIService.getPersonalMemory(userId);
+  const setApiKey = useCallback((key: string) => {
+    aiService.setApiKey(key);
+    setHasApiKey(!!key);
   }, []);
 
-  const getLearningProgress = useCallback(() => {
-    return realAIService.getLearningProgress();
+  const setHuggingFaceKey = useCallback((key: string) => {
+    aiService.setHuggingFaceKey(key);
+  }, []);
+
+  const setSelectedModel = useCallback((model: 'openai' | 'huggingface' | 'autonomous') => {
+    aiService.setSelectedModel(model);
+    setSelectedModelState(model);
   }, []);
 
   return {
     generateResponse,
-    analyzeEmotion,
+    generateAutonomousThought,
     learnFromUrl,
-    getPersonalMemory,
-    getLearningProgress,
     isThinking,
+    setApiKey,
     setHuggingFaceKey,
-    hasApiKey
+    setSelectedModel,
+    hasApiKey,
+    selectedModel,
+    quantumState,
+    rewardSystem
   };
 };

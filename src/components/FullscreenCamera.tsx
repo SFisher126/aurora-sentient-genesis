@@ -1,7 +1,7 @@
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { X, Circle, Square } from 'lucide-react';
+import { X, RotateCcw } from 'lucide-react';
 
 interface FullscreenCameraProps {
   isOpen: boolean;
@@ -10,10 +10,19 @@ interface FullscreenCameraProps {
   mode: 'photo' | 'video';
 }
 
-const FullscreenCamera: React.FC<FullscreenCameraProps> = ({ isOpen, onClose, onCapture, mode }) => {
+const FullscreenCamera: React.FC<FullscreenCameraProps> = ({
+  isOpen,
+  onClose,
+  onCapture,
+  mode
+}) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+  const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -23,12 +32,16 @@ const FullscreenCamera: React.FC<FullscreenCameraProps> = ({ isOpen, onClose, on
     }
 
     return () => stopCamera();
-  }, [isOpen]);
+  }, [isOpen, facingMode]);
 
   const startCamera = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
+        video: { 
+          facingMode: facingMode,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        },
         audio: mode === 'video'
       });
       
@@ -38,7 +51,6 @@ const FullscreenCamera: React.FC<FullscreenCameraProps> = ({ isOpen, onClose, on
       }
     } catch (error) {
       console.error('Camera access error:', error);
-      onClose();
     }
   };
 
@@ -47,75 +59,131 @@ const FullscreenCamera: React.FC<FullscreenCameraProps> = ({ isOpen, onClose, on
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
     }
+    if (isRecording) {
+      stopVideoRecording();
+    }
   };
 
   const capturePhoto = () => {
-    if (!videoRef.current) return;
-
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    if (!context) return;
-
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
-    context.drawImage(videoRef.current, 0, 0);
-    
-    const dataUrl = canvas.toDataURL('image/jpeg');
-    onCapture(dataUrl);
-    onClose();
+    if (videoRef.current && canvasRef.current) {
+      const canvas = canvasRef.current;
+      const video = videoRef.current;
+      const context = canvas.getContext('2d');
+      
+      if (context) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0);
+        
+        const imageData = canvas.toDataURL('image/jpeg', 0.8);
+        onCapture(imageData);
+        onClose();
+      }
+    }
   };
 
-  const toggleVideoRecording = () => {
-    if (isRecording) {
-      // Остановка записи (упрощенная версия)
-      setIsRecording(false);
-      onCapture('video_data_placeholder');
+  const startVideoRecording = () => {
+    if (!stream) return;
+
+    const mediaRecorder = new MediaRecorder(stream, {
+      mimeType: 'video/webm'
+    });
+
+    mediaRecorderRef.current = mediaRecorder;
+    setRecordedChunks([]);
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        setRecordedChunks(prev => [...prev, event.data]);
+      }
+    };
+
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recordedChunks, { type: 'video/webm' });
+      const videoUrl = URL.createObjectURL(blob);
+      onCapture(videoUrl);
       onClose();
-    } else {
-      setIsRecording(true);
-      // Начало записи
+    };
+
+    mediaRecorder.start();
+    setIsRecording(true);
+  };
+
+  const stopVideoRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
     }
+  };
+
+  const toggleCamera = () => {
+    setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black">
-      <div className="relative w-full h-full">
+    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+      {/* Заголовок */}
+      <div className="flex justify-between items-center p-4 text-white bg-black/50">
+        <Button
+          onClick={onClose}
+          variant="ghost"
+          className="text-white hover:bg-gray-800 rounded-full"
+        >
+          <X className="w-6 h-6" />
+        </Button>
+        <h2 className="text-lg font-semibold">
+          {mode === 'photo' ? 'Фото' : 'Видео'}
+        </h2>
+        <Button
+          onClick={toggleCamera}
+          variant="ghost"
+          className="text-white hover:bg-gray-800 rounded-full"
+        >
+          <RotateCcw className="w-6 h-6" />
+        </Button>
+      </div>
+
+      {/* Камера */}
+      <div className="flex-1 relative">
         <video
           ref={videoRef}
           autoPlay
           playsInline
-          muted
+          muted={mode === 'photo'}
           className="w-full h-full object-cover"
         />
         
-        <div className="absolute top-4 right-4">
-          <Button
-            onClick={onClose}
-            variant="ghost"
-            className="text-white bg-black/20 rounded-full w-10 h-10 p-0"
-          >
-            <X className="w-6 h-6" />
-          </Button>
-        </div>
+        <canvas ref={canvasRef} className="hidden" />
         
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
-          <Button
-            onClick={mode === 'photo' ? capturePhoto : toggleVideoRecording}
-            className={`rounded-full w-16 h-16 p-0 ${
-              isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-white hover:bg-gray-200'
-            }`}
-          >
-            {mode === 'photo' ? (
-              <Circle className="w-8 h-8 text-black" />
-            ) : isRecording ? (
-              <Square className="w-6 h-6 text-white" />
-            ) : (
-              <Circle className="w-8 h-8 text-black" />
-            )}
-          </Button>
-        </div>
+        {/* Индикатор записи */}
+        {isRecording && (
+          <div className="absolute top-4 left-4 flex items-center bg-red-600 text-white px-3 py-1 rounded-full">
+            <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
+            <span className="text-sm font-medium">REC</span>
+          </div>
+        )}
+      </div>
+
+      {/* Управление */}
+      <div className="p-6 flex justify-center bg-black/50">
+        <Button
+          onClick={mode === 'photo' ? capturePhoto : isRecording ? stopVideoRecording : startVideoRecording}
+          className={`w-20 h-20 rounded-full border-4 ${
+            mode === 'photo' 
+              ? 'bg-white hover:bg-gray-200 text-black border-white' 
+              : isRecording 
+                ? 'bg-red-600 hover:bg-red-700 border-red-400' 
+                : 'bg-white hover:bg-gray-200 text-black border-white'
+          }`}
+        >
+          {mode === 'photo' ? (
+            <div className="w-16 h-16 rounded-full border-2 border-current"></div>
+          ) : (
+            <div className={`${isRecording ? 'w-6 h-6 bg-white rounded-sm' : 'w-6 h-6 bg-red-600 rounded-full'}`}></div>
+          )}
+        </Button>
       </div>
     </div>
   );
