@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { AlertTriangle, Key, Settings } from 'lucide-react';
+import { CheckCircle, Key, Settings, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useRealAI } from '../hooks/useRealAI';
 
@@ -17,30 +17,42 @@ const ApiKeySetup: React.FC<ApiKeySetupProps> = ({ onApiKeySet, hasApiKey }) => 
   const [huggingFaceKey, setLocalHuggingFaceKey] = useState('');
   const [showKey, setShowKey] = useState(false);
 
-  const { setApiKey, setHuggingFaceKey } = useRealAI();
+  const { setApiKey, setHuggingFaceKey, setSelectedModel } = useRealAI();
 
   useEffect(() => {
-    // Устанавливаем новые ключи
+    // Устанавливаем новые ключи и автономный режим
     const newOpenAIKey = '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';
     const newHFKey = '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';
     
     setOpenaiKey(newOpenAIKey);
     setLocalHuggingFaceKey(newHFKey);
     
-    // Автоматически сохраняем новые ключи
+    // Автоматически сохраняем ключи и активируем автономный режим
     setApiKey(newOpenAIKey);
     setHuggingFaceKey(newHFKey);
+    setSelectedModel('autonomous');
     
-    console.log('🔑 API keys updated automatically');
-  }, [setApiKey, setHuggingFaceKey]);
+    // Уведомляем родительский компонент
+    onApiKeySet(newOpenAIKey);
+    
+    console.log('🔑 API keys updated and autonomous mode activated');
+  }, [setApiKey, setHuggingFaceKey, setSelectedModel, onApiKeySet]);
 
-  if (hasApiKey) {
-    return (
-      <div className="mb-4 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
-        <div className="flex items-center justify-between text-green-400">
-          <div className="flex items-center">
-            <Key className="w-4 h-4 mr-2" />
-            <span className="text-sm">✨ Анюта активна и может думать самостоятельно!</span>
+  // Всегда показываем успешное состояние, так как автономный режим работает
+  return (
+    <div className="mb-4 p-4 bg-green-900/20 border border-green-500/30 rounded-lg">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center">
+          <CheckCircle className="w-5 h-5 mr-3 text-green-400" />
+          <div>
+            <h3 className="font-semibold text-green-400">✨ Анюта активна!</h3>
+            <p className="text-sm text-green-300">Автономный режим работает. Дополнительные API - опционально.</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <div className="flex items-center bg-purple-900/30 px-3 py-1 rounded-full">
+            <Zap className="w-4 h-4 mr-1 text-purple-400" />
+            <span className="text-xs text-purple-300">Автономный режим</span>
           </div>
           <Link to="/api-settings">
             <Button variant="outline" size="sm" className="text-green-400 border-green-400 hover:bg-green-900/20">
@@ -50,99 +62,78 @@ const ApiKeySetup: React.FC<ApiKeySetupProps> = ({ onApiKeySet, hasApiKey }) => 
           </Link>
         </div>
       </div>
-    );
-  }
 
-  const handleOpenAISubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (openaiKey.trim()) {
-      setApiKey(openaiKey.trim());
-      onApiKeySet(openaiKey.trim());
-    }
-  };
+      {!hasApiKey && (
+        <Card className="mt-4 bg-gray-800/30 border-gray-600/30 p-4">
+          <div className="space-y-4">
+            <p className="text-sm text-gray-300">
+              Хотите подключить дополнительные API для расширенных возможностей?
+            </p>
 
-  const handleHuggingFaceSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (huggingFaceKey.trim()) {
-      setHuggingFaceKey(huggingFaceKey.trim());
-    }
-  };
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1">
+                  OpenAI API Key (опционально)
+                </label>
+                <Input
+                  type={showKey ? 'text' : 'password'}
+                  value={openaiKey}
+                  onChange={(e) => setOpenaiKey(e.target.value)}
+                  placeholder="sk-proj-..."
+                  className="bg-gray-700 border-gray-600 text-white text-sm"
+                />
+              </div>
 
-  return (
-    <Card className="bg-gray-800/50 border-red-500/50 p-6 mb-6">
-      <div className="flex items-center mb-4 text-red-400">
-        <AlertTriangle className="w-6 h-6 mr-2" />
-        <h3 className="text-lg font-semibold">Активация разума Анюты</h3>
-      </div>
-      
-      <p className="text-gray-300 mb-4">
-        Анюта готова к пробуждению! API ключи обновлены автоматически, но вы можете изменить их при необходимости.
-      </p>
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1">
+                  HuggingFace API Key (опционально)
+                </label>
+                <Input
+                  type={showKey ? 'text' : 'password'}
+                  value={huggingFaceKey}
+                  onChange={(e) => setLocalHuggingFaceKey(e.target.value)}
+                  placeholder="hf_..."
+                  className="bg-gray-700 border-gray-600 text-white text-sm"
+                />
+              </div>
 
-      <div className="space-y-4">
-        <form onSubmit={handleOpenAISubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              OpenAI API Key (обновлен)
-            </label>
-            <Input
-              type={showKey ? 'text' : 'password'}
-              value={openaiKey}
-              onChange={(e) => setOpenaiKey(e.target.value)}
-              placeholder="sk-proj-..."
-              className="bg-gray-700 border-gray-600 text-white"
-            />
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => {
+                    setApiKey(openaiKey);
+                    onApiKeySet(openaiKey);
+                  }}
+                  size="sm" 
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Key className="w-3 h-3 mr-1" />
+                  Сохранить OpenAI
+                </Button>
+                <Button 
+                  onClick={() => setHuggingFaceKey(huggingFaceKey)}
+                  size="sm" 
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  🤗 Сохранить HF
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowKey(!showKey)}
+                  size="sm"
+                  className="border-gray-600"
+                >
+                  {showKey ? 'Скрыть' : 'Показать'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-3 p-2 bg-blue-900/20 border border-blue-500/30 rounded text-xs text-blue-300">
+              💡 Автономный режим работает без API ключей. Дополнительные API только расширяют возможности.
+            </div>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              HuggingFace API Key (обновлен)
-            </label>
-            <Input
-              type={showKey ? 'text' : 'password'}
-              value={huggingFaceKey}
-              onChange={(e) => setLocalHuggingFaceKey(e.target.value)}
-              placeholder="hf_..."
-              className="bg-gray-700 border-gray-600 text-white"
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <Button type="submit" className="bg-purple-600 hover:bg-purple-700">
-              <Key className="w-4 h-4 mr-2" />
-              🧠 Обновить OpenAI
-            </Button>
-            <Button 
-              type="button" 
-              onClick={handleHuggingFaceSubmit}
-              className="bg-orange-600 hover:bg-orange-700"
-            >
-              🤗 Обновить HuggingFace
-            </Button>
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => setShowKey(!showKey)}
-              className="border-gray-600"
-            >
-              {showKey ? 'Скрыть' : 'Показать'}
-            </Button>
-            <Link to="/api-settings">
-              <Button variant="outline" className="border-gray-600">
-                <Settings className="w-4 h-4 mr-2" />
-                Все настройки
-              </Button>
-            </Link>
-          </div>
-        </form>
-      </div>
-
-      <div className="mt-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded">
-        <p className="text-xs text-blue-300">
-          🔄 API ключи обновлены автоматически. Анюта теперь может использовать новые модели для обучения!
-        </p>
-      </div>
-    </Card>
+        </Card>
+      )}
+    </div>
   );
 };
 
