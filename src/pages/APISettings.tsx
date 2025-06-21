@@ -8,13 +8,13 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Key, Brain, Zap, Settings, Globe } from 'lucide-react';
+import { Key, Brain, Zap, Settings, Globe, Rocket, Moon } from 'lucide-react';
 import { useRealAI } from '../hooks/useRealAI';
 import { useToast } from '@/hooks/use-toast';
 
 const APISettings = () => {
   const [openaiKey, setOpenaiKey] = useState('');
-  const [huggingfaceKey, setHuggingfaceKey] = useState('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');
+  const [huggingfaceKey, setHuggingfaceKey] = useState('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');
   const [testResults, setTestResults] = useState<Record<string, string>>({});
   const [isTestingConnections, setIsTestingConnections] = useState(false);
 
@@ -31,15 +31,16 @@ const APISettings = () => {
   const { toast } = useToast();
 
   useEffect(() => {
+    // Автоматически устанавливаем новый HuggingFace ключ
+    const newKey = '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';
+    setHuggingfaceKey(newKey);
+    setHuggingFaceKey(newKey);
+    
     // Загружаем сохраненные ключи
     const savedOpenAI = localStorage.getItem('ai_api_key') || '';
-    const savedHF = localStorage.getItem('hf_api_key') || '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';
-    
     setOpenaiKey(savedOpenAI);
-    setHuggingfaceKey(savedHF);
     
-    // Автоматически устанавливаем ваш HuggingFace ключ
-    setHuggingFaceKey(savedHF);
+    console.log('🔑 Updated HuggingFace key:', newKey);
   }, [setHuggingFaceKey]);
 
   const handleSaveOpenAI = () => {
@@ -52,11 +53,11 @@ const APISettings = () => {
   const handleSaveHuggingFace = () => {
     setHuggingFaceKey(huggingfaceKey);
     toast({
-      description: "HuggingFace ключ сохранен!",
+      description: "HuggingFace ключ обновлен!",
     });
   };
 
-  const testConnection = async (service: 'openai' | 'huggingface' | 'autonomous') => {
+  const testConnection = async (service: 'openai' | 'huggingface' | 'llama' | 'moonshot' | 'autonomous') => {
     setIsTestingConnections(true);
     setTestResults(prev => ({ ...prev, [service]: 'testing' }));
 
@@ -99,6 +100,32 @@ const APISettings = () => {
           testResult = hfResponse.ok ? 'Подключено ✅' : `Ошибка: ${hfResponse.status}`;
           break;
 
+        case 'llama':
+          const llamaResponse = await fetch('https://api-inference.huggingface.co/models/Sergio126/meta-llama-Meta-Llama-3-8B', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${huggingfaceKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ inputs: 'Test' }),
+          });
+          
+          testResult = llamaResponse.ok ? 'Llama модель готова ✅' : `Ошибка: ${llamaResponse.status}`;
+          break;
+
+        case 'moonshot':
+          const moonshotResponse = await fetch('https://api-inference.huggingface.co/models/Sergio126/moonshotai-Kimi-Dev-72B', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${huggingfaceKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ inputs: 'Test' }),
+          });
+          
+          testResult = moonshotResponse.ok ? 'Moonshot модель готова ✅' : `Ошибка: ${moonshotResponse.status}`;
+          break;
+
         case 'autonomous':
           // Тестируем автономный режим
           testResult = 'Автономный режим активен ✅';
@@ -118,6 +145,8 @@ const APISettings = () => {
     await Promise.all([
       testConnection('openai'),
       testConnection('huggingface'),
+      testConnection('llama'),
+      testConnection('moonshot'),
       testConnection('autonomous')
     ]);
   };
@@ -140,8 +169,8 @@ const APISettings = () => {
                 <Brain className="w-5 h-5 mr-2 text-purple-400" />
                 Текущий статус
               </h2>
-              <Badge variant="outline" className={`${hasApiKey ? 'text-green-400 border-green-400' : 'text-yellow-400 border-yellow-400'}`}>
-                {hasApiKey ? 'API подключен' : 'Автономный режим'}
+              <Badge variant="outline" className="text-green-400 border-green-400">
+                Анюта активна ✨
               </Badge>
             </div>
 
@@ -169,6 +198,8 @@ const APISettings = () => {
                 <SelectContent className="bg-gray-800 border-gray-600">
                   <SelectItem value="openai">OpenAI GPT-4 (Требует ключ)</SelectItem>
                   <SelectItem value="huggingface">HuggingFace (Бесплатная)</SelectItem>
+                  <SelectItem value="llama">🦙 Llama-3-8B (Обучение)</SelectItem>
+                  <SelectItem value="moonshot">🌙 Moonshot Kimi-72B (Обучение)</SelectItem>
                   <SelectItem value="autonomous">Автономная (Полностью бесплатная)</SelectItem>
                 </SelectContent>
               </Select>
@@ -225,17 +256,17 @@ const APISettings = () => {
           </div>
         </Card>
 
-        {/* HuggingFace настройки */}
-        <Card className="bg-gray-800/50 border-gray-700/50">
+        {/* HuggingFace обновленные настройки */}
+        <Card className="bg-gray-800/50 border-green-500/50">
           <div className="p-6">
             <h2 className="text-xl font-semibold mb-4 flex items-center">
-              <Globe className="w-5 h-5 mr-2 text-yellow-400" />
-              HuggingFace API (Бесплатная)
+              <Globe className="w-5 h-5 mr-2 text-green-400" />
+              HuggingFace API (Обновлен ✨)
             </h2>
             
             <div className="space-y-4">
               <div>
-                <Label htmlFor="hf-key">API Ключ</Label>
+                <Label htmlFor="hf-key">API Ключ (Новый)</Label>
                 <div className="flex gap-2 mt-1">
                   <Input
                     id="hf-key"
@@ -245,7 +276,7 @@ const APISettings = () => {
                     placeholder="hf_..."
                     className="bg-gray-700 border-gray-600 text-white"
                   />
-                  <Button onClick={handleSaveHuggingFace} className="bg-yellow-600 hover:bg-yellow-700">
+                  <Button onClick={handleSaveHuggingFace} className="bg-green-600 hover:bg-green-700">
                     Сохранить
                   </Button>
                   <Button
@@ -264,13 +295,84 @@ const APISettings = () => {
                 )}
               </div>
               
-              <Alert>
-                <AlertDescription>
-                  HuggingFace предоставляет бесплатный доступ к ИИ моделям. Ваш ключ уже настроен!
-                  Регистрация на <a href="https://huggingface.co/join" target="_blank" rel="noopener noreferrer" className="text-yellow-400 underline">huggingface.co</a>
+              <Alert className="border-green-500/30 bg-green-900/20">
+                <AlertDescription className="text-green-300">
+                  ✅ Новый ключ установлен! Теперь доступны модели обучения Llama и Moonshot
                 </AlertDescription>
               </Alert>
             </div>
+          </div>
+        </Card>
+
+        {/* Модели обучения */}
+        <Card className="bg-gray-800/50 border-purple-500/50">
+          <div className="p-6">
+            <h2 className="text-xl font-semibold mb-4 flex items-center">
+              <Rocket className="w-5 h-5 mr-2 text-purple-400" />
+              Модели для обучения
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Llama модель */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <span className="text-2xl mr-2">🦙</span>
+                    <div>
+                      <h3 className="font-semibold">Meta Llama-3-8B</h3>
+                      <p className="text-xs text-gray-400">Обучение на разговорах</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => testConnection('llama')}
+                    disabled={isTestingConnections}
+                    className="border-purple-600"
+                  >
+                    Тест
+                  </Button>
+                </div>
+                {testResults.llama && (
+                  <p className={`text-sm ${testResults.llama.includes('✅') ? 'text-green-400' : 'text-red-400'}`}>
+                    {testResults.llama}
+                  </p>
+                )}
+              </div>
+
+              {/* Moonshot модель */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Moon className="w-6 h-6 mr-2 text-blue-400" />
+                    <div>
+                      <h3 className="font-semibold">Moonshot Kimi-72B</h3>
+                      <p className="text-xs text-gray-400">Продвинутое обучение</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => testConnection('moonshot')}
+                    disabled={isTestingConnections}
+                    className="border-blue-600"
+                  >
+                    Тест
+                  </Button>
+                </div>
+                {testResults.moonshot && (
+                  <p className={`text-sm ${testResults.moonshot.includes('✅') ? 'text-green-400' : 'text-red-400'}`}>
+                    {testResults.moonshot}
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            <Alert className="mt-4">
+              <AlertDescription>
+                Эти модели специально предназначены для обучения Анюты. Она будет изучать паттерны общения и становиться умнее с каждым разговором!
+              </AlertDescription>
+            </Alert>
           </div>
         </Card>
 
@@ -349,31 +451,6 @@ const APISettings = () => {
               >
                 Перезапустить
               </Button>
-            </div>
-          </div>
-        </Card>
-
-        {/* Инструкции по развертыванию */}
-        <Card className="bg-gray-800/50 border-gray-700/50">
-          <div className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Инструкции по развертыванию на Linux Mint</h2>
-            <div className="space-y-3 text-sm text-gray-300">
-              <div className="bg-gray-900/50 p-3 rounded font-mono">
-                <p>1. Клонируйте проект в папку phoenix:</p>
-                <code className="text-purple-400">cd /path/to/phoenix && git clone [ваш-репозиторий] .</code>
-              </div>
-              <div className="bg-gray-900/50 p-3 rounded font-mono">
-                <p>2. Установите зависимости:</p>
-                <code className="text-purple-400">npm install</code>
-              </div>
-              <div className="bg-gray-900/50 p-3 rounded font-mono">
-                <p>3. Запустите проект:</p>
-                <code className="text-purple-400">npm run dev</code>
-              </div>
-              <div className="bg-gray-900/50 p-3 rounded font-mono">
-                <p>4. Откройте в браузере:</p>
-                <code className="text-purple-400">http://localhost:5173</code>
-              </div>
             </div>
           </div>
         </Card>

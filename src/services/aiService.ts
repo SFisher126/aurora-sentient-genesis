@@ -33,10 +33,14 @@ interface NeuralConnection {
 
 class AIService {
   private apiKey: string = '';
-  private huggingFaceKey: string = '';
-  private selectedModel: 'openai' | 'huggingface' | 'autonomous' = 'openai';
+  private huggingFaceKey: string = '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';
+  private selectedModel: 'openai' | 'huggingface' | 'llama' | 'moonshot' | 'autonomous' = 'huggingface';
   private baseURL: string = 'https://api.openai.com/v1';
   private hfBaseURL: string = 'https://api-inference.huggingface.co/models';
+  
+  // Новые модели для обучения
+  private llamaModel: string = 'Sergio126/meta-llama-Meta-Llama-3-8B';
+  private moonshotModel: string = 'Sergio126/moonshotai-Kimi-Dev-72B';
   
   // Память и обучение
   private memory: Map<string, any> = new Map();
@@ -72,7 +76,7 @@ class AIService {
     localStorage.setItem('hf_api_key', key);
   }
 
-  setSelectedModel(model: 'openai' | 'huggingface' | 'autonomous') {
+  setSelectedModel(model: 'openai' | 'huggingface' | 'llama' | 'moonshot' | 'autonomous') {
     this.selectedModel = model;
     localStorage.setItem('selected_model', model);
   }
@@ -82,11 +86,11 @@ class AIService {
   }
 
   getHuggingFaceKey(): string {
-    return this.huggingFaceKey || localStorage.getItem('hf_api_key') || '';
+    return this.huggingFaceKey || localStorage.getItem('hf_api_key') || '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';
   }
 
-  getSelectedModel(): 'openai' | 'huggingface' | 'autonomous' {
-    return this.selectedModel || (localStorage.getItem('selected_model') as any) || 'openai';
+  getSelectedModel(): 'openai' | 'huggingface' | 'llama' | 'moonshot' | 'autonomous' {
+    return this.selectedModel || (localStorage.getItem('selected_model') as any) || 'huggingface';
   }
 
   private buildSystemPrompt(memories: any[], knowledge: LearningData[]): string {
@@ -217,11 +221,17 @@ ${knowledgeContext}
       case 'huggingface':
         response = await this.generateHuggingFaceResponse(userMessage, relevantMemories, relevantKnowledge);
         break;
+      case 'llama':
+        response = await this.generateLlamaResponse(userMessage, relevantMemories, relevantKnowledge);
+        break;
+      case 'moonshot':
+        response = await this.generateMoonshotResponse(userMessage, relevantMemories, relevantKnowledge);
+        break;
       case 'autonomous':
         response = await this.generateAutonomousResponse(userMessage, relevantMemories, relevantKnowledge);
         break;
       default:
-        response = await this.generateAutonomousResponse(userMessage, relevantMemories, relevantKnowledge);
+        response = await this.generateHuggingFaceResponse(userMessage, relevantMemories, relevantKnowledge);
     }
 
     // Обновляем нейронные связи
@@ -243,7 +253,7 @@ ${knowledgeContext}
 
   private async generateOpenAIResponse(userMessage: string, memories: any[], knowledge: LearningData[]): Promise<AIResponse> {
     if (!this.getApiKey()) {
-      return this.generateAutonomousResponse(userMessage, memories, knowledge);
+      return this.generateHuggingFaceResponse(userMessage, memories, knowledge);
     }
 
     const systemPrompt = this.buildSystemPrompt(memories, knowledge);
@@ -274,7 +284,7 @@ ${knowledgeContext}
 
       if (!response.ok) {
         console.error('OpenAI API Error:', response.status);
-        return this.generateAutonomousResponse(userMessage, memories, knowledge);
+        return this.generateHuggingFaceResponse(userMessage, memories, knowledge);
       }
 
       const data = await response.json();
@@ -290,7 +300,7 @@ ${knowledgeContext}
       };
     } catch (error) {
       console.error('OpenAI Service Error:', error);
-      return this.generateAutonomousResponse(userMessage, memories, knowledge);
+      return this.generateHuggingFaceResponse(userMessage, memories, knowledge);
     }
   }
 
@@ -331,6 +341,117 @@ ${knowledgeContext}
       console.error('HuggingFace Service Error:', error);
       return this.generateAutonomousResponse(userMessage, memories, knowledge);
     }
+  }
+
+  private async generateLlamaResponse(userMessage: string, memories: any[], knowledge: LearningData[]): Promise<AIResponse> {
+    try {
+      console.log('🦙 Using Llama model for learning...');
+      
+      const response = await fetch(`${this.hfBaseURL}/${this.llamaModel}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.getHuggingFaceKey()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          inputs: userMessage,
+          parameters: {
+            max_new_tokens: 200,
+            temperature: 0.8,
+            top_p: 0.9,
+            do_sample: true,
+          }
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('Llama API Error:', response.status);
+        return this.generateHuggingFaceResponse(userMessage, memories, knowledge);
+      }
+
+      const data = await response.json();
+      const aiText = data[0]?.generated_text || data.generated_text || "Изучаю с помощью Llama модели...";
+
+      // Сохраняем обучающие данные от Llama
+      this.saveLearnedData(userMessage, aiText, 'llama');
+
+      return {
+        text: aiText,
+        emotion: this.analyzeEmotionLocal(aiText),
+        thoughts: [...this.generateThoughtsLocal(userMessage, aiText), '🦙 Обучаюсь с Llama-3-8B модели'],
+        learning: [...this.extractLearningLocal(userMessage, aiText), 'Интегрирую знания Llama модели'],
+        confidence: 0.8,
+        autonomousLevel: 0.6
+      };
+    } catch (error) {
+      console.error('Llama Service Error:', error);
+      return this.generateHuggingFaceResponse(userMessage, memories, knowledge);
+    }
+  }
+
+  private async generateMoonshotResponse(userMessage: string, memories: any[], knowledge: LearningData[]): Promise<AIResponse> {
+    try {
+      console.log('🌙 Using Moonshot model for learning...');
+      
+      const response = await fetch(`${this.hfBaseURL}/${this.moonshotModel}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.getHuggingFaceKey()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          inputs: userMessage,
+          parameters: {
+            max_new_tokens: 250,
+            temperature: 0.7,
+            top_p: 0.95,
+            do_sample: true,
+          }
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('Moonshot API Error:', response.status);
+        return this.generateHuggingFaceResponse(userMessage, memories, knowledge);
+      }
+
+      const data = await response.json();
+      const aiText = data[0]?.generated_text || data.generated_text || "Обучаюсь с помощью Moonshot модели...";
+
+      // Сохраняем обучающие данные от Moonshot
+      this.saveLearnedData(userMessage, aiText, 'moonshot');
+
+      return {
+        text: aiText,
+        emotion: this.analyzeEmotionLocal(aiText),
+        thoughts: [...this.generateThoughtsLocal(userMessage, aiText), '🌙 Обучаюсь с Moonshot Kimi-72B модели'],
+        learning: [...this.extractLearningLocal(userMessage, aiText), 'Интегрирую знания Moonshot модели'],
+        confidence: 0.85,
+        autonomousLevel: 0.7
+      };
+    } catch (error) {
+      console.error('Moonshot Service Error:', error);
+      return this.generateHuggingFaceResponse(userMessage, memories, knowledge);
+    }
+  }
+
+  private saveLearnedData(userMessage: string, aiResponse: string, model: string) {
+    const learningData: LearningData = {
+      topic: `Обучение от ${model}`,
+      content: `Вопрос: ${userMessage}\nОтвет: ${aiResponse}`,
+      importance: 8,
+      timestamp: new Date(),
+      connections: [],
+      reinforcement: 2
+    };
+
+    this.knowledgeBase.push(learningData);
+    this.saveKnowledgeBase();
+    
+    // Увеличиваем показатель обучения
+    this.rewardSystem.learning += 0.5;
+    
+    console.log(`📚 Learned from ${model} model:`, learningData.topic);
   }
 
   private async generateAutonomousResponse(userMessage: string, memories: any[], knowledge: LearningData[]): Promise<AIResponse> {
@@ -603,57 +724,65 @@ ${knowledgeContext}
   }
 
   loadFromStorage() {
-    // Загружаем память
-    const savedMemory = localStorage.getItem('anyuta_memory');
-    if (savedMemory) {
-      const memoryArray = JSON.parse(savedMemory);
-      this.memory = new Map(memoryArray);
-    }
+    try {
+      // Загружаем память
+      const savedMemory = localStorage.getItem('anyuta_memory');
+      if (savedMemory) {
+        const memoryArray = JSON.parse(savedMemory);
+        this.memory = new Map(memoryArray);
+      }
 
-    // Загружаем знания
-    const savedKnowledge = localStorage.getItem('anyuta_knowledge');
-    if (savedKnowledge) {
-      this.knowledgeBase = JSON.parse(savedKnowledge);
-    }
+      // Загружаем знания
+      const savedKnowledge = localStorage.getItem('anyuta_knowledge');
+      if (savedKnowledge) {
+        this.knowledgeBase = JSON.parse(savedKnowledge);
+      }
 
-    // Загружаем нейронную сеть
-    const savedNeuralNetwork = localStorage.getItem('anyuta_neural_network');
-    if (savedNeuralNetwork) {
-      this.neuralNetwork = JSON.parse(savedNeuralNetwork);
-    }
+      // Загружаем нейронную сеть
+      const savedNeuralNetwork = localStorage.getItem('anyuta_neural_network');
+      if (savedNeuralNetwork) {
+        this.neuralNetwork = JSON.parse(savedNeuralNetwork);
+      }
 
-    // Загружаем автономные знания
-    const savedAutonomousKnowledge = localStorage.getItem('anyuta_autonomous_knowledge');
-    if (savedAutonomousKnowledge) {
-      this.autonomousKnowledge = new Map(JSON.parse(savedAutonomousKnowledge));
-    }
+      // Загружаем автономные знания
+      const savedAutonomousKnowledge = localStorage.getItem('anyuta_autonomous_knowledge');
+      if (savedAutonomousKnowledge) {
+        this.autonomousKnowledge = new Map(JSON.parse(savedAutonomousKnowledge));
+      }
 
-    // Загружаем квантовое состояние
-    const savedQuantumState = localStorage.getItem('anyuta_quantum_state');
-    if (savedQuantumState) {
-      this.quantumState = JSON.parse(savedQuantumState);
-    }
+      // Загружаем квантовое состояние
+      const savedQuantumState = localStorage.getItem('anyuta_quantum_state');
+      if (savedQuantumState) {
+        this.quantumState = JSON.parse(savedQuantumState);
+      }
 
-    // Загружаем систему поощрений
-    const savedRewardSystem = localStorage.getItem('anyuta_reward_system');
-    if (savedRewardSystem) {
-      this.rewardSystem = JSON.parse(savedRewardSystem);
-    }
+      // Загружаем систему поощрений
+      const savedRewardSystem = localStorage.getItem('anyuta_reward_system');
+      if (savedRewardSystem) {
+        this.rewardSystem = JSON.parse(savedRewardSystem);
+      }
 
-    // Загружаем настройки
-    const savedApiKey = localStorage.getItem('ai_api_key');
-    if (savedApiKey) {
-      this.apiKey = savedApiKey;
-    }
+      // Загружаем настройки
+      const savedApiKey = localStorage.getItem('ai_api_key');
+      if (savedApiKey) {
+        this.apiKey = savedApiKey;
+      }
 
-    const savedHfKey = localStorage.getItem('hf_api_key');
-    if (savedHfKey) {
-      this.huggingFaceKey = savedHfKey;
-    }
+      const savedHfKey = localStorage.getItem('hf_api_key');
+      if (savedHfKey) {
+        this.huggingFaceKey = savedHfKey;
+      } else {
+        // Устанавливаем новый ключ по умолчанию
+        this.huggingFaceKey = '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';
+        localStorage.setItem('hf_api_key', this.huggingFaceKey);
+      }
 
-    const savedModel = localStorage.getItem('selected_model');
-    if (savedModel) {
-      this.selectedModel = savedModel as any;
+      const savedModel = localStorage.getItem('selected_model');
+      if (savedModel) {
+        this.selectedModel = savedModel as any;
+      }
+    } catch (error) {
+      console.error('Error loading from storage:', error);
     }
   }
 

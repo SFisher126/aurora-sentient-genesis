@@ -9,9 +9,9 @@ interface UseRealAIReturn {
   isThinking: boolean;
   setApiKey: (key: string) => void;
   setHuggingFaceKey: (key: string) => void;
-  setSelectedModel: (model: 'openai' | 'huggingface' | 'autonomous') => void;
+  setSelectedModel: (model: 'openai' | 'huggingface' | 'llama' | 'moonshot' | 'autonomous') => void;
   hasApiKey: boolean;
-  selectedModel: 'openai' | 'huggingface' | 'autonomous';
+  selectedModel: 'openai' | 'huggingface' | 'llama' | 'moonshot' | 'autonomous';
   quantumState: any;
   rewardSystem: any;
 }
@@ -19,14 +19,14 @@ interface UseRealAIReturn {
 export const useRealAI = (): UseRealAIReturn => {
   const [isThinking, setIsThinking] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
-  const [selectedModel, setSelectedModelState] = useState<'openai' | 'huggingface' | 'autonomous'>('openai');
+  const [selectedModel, setSelectedModelState] = useState<'openai' | 'huggingface' | 'llama' | 'moonshot' | 'autonomous'>('huggingface');
   const [quantumState, setQuantumState] = useState(aiService.getQuantumState());
   const [rewardSystem, setRewardSystem] = useState(aiService.getRewardSystem());
 
   useEffect(() => {
     try {
       aiService.loadFromStorage();
-      setHasApiKey(!!aiService.getApiKey());
+      setHasApiKey(!!aiService.getApiKey() || !!aiService.getHuggingFaceKey());
       setSelectedModelState(aiService.getSelectedModel());
       updateStates();
     } catch (error) {
@@ -60,14 +60,15 @@ export const useRealAI = (): UseRealAIReturn => {
 
   const setApiKey = useCallback((key: string) => {
     aiService.setApiKey(key);
-    setHasApiKey(!!key);
+    setHasApiKey(!!key || !!aiService.getHuggingFaceKey());
   }, []);
 
   const setHuggingFaceKey = useCallback((key: string) => {
     aiService.setHuggingFaceKey(key);
+    setHasApiKey(!!aiService.getApiKey() || !!key);
   }, []);
 
-  const setSelectedModel = useCallback((model: 'openai' | 'huggingface' | 'autonomous') => {
+  const setSelectedModel = useCallback((model: 'openai' | 'huggingface' | 'llama' | 'moonshot' | 'autonomous') => {
     aiService.setSelectedModel(model);
     setSelectedModelState(model);
   }, []);
