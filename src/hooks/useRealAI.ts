@@ -25,52 +25,104 @@ export const useRealAI = (): UseRealAIReturn => {
 
   useEffect(() => {
     try {
+      console.log('🔧 Initializing AI service...');
       aiService.loadFromStorage();
+      
+      // Обновляем API ключ OpenAI на новый
+      const newOpenAIKey = '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';
+      aiService.setApiKey(newOpenAIKey);
+      
+      // Обновляем HuggingFace ключ
+      const newHFKey = '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';
+      aiService.setHuggingFaceKey(newHFKey);
+      
       setHasApiKey(!!aiService.getApiKey() || !!aiService.getHuggingFaceKey());
       setSelectedModelState(aiService.getSelectedModel());
       updateStates();
+      
+      console.log('✅ AI service initialized successfully');
     } catch (error) {
-      console.error('Error loading AI service:', error);
+      console.error('❌ Error loading AI service:', error);
     }
   }, []);
 
   const updateStates = () => {
-    setQuantumState(aiService.getQuantumState());
-    setRewardSystem(aiService.getRewardSystem());
+    try {
+      setQuantumState(aiService.getQuantumState());
+      setRewardSystem(aiService.getRewardSystem());
+    } catch (error) {
+      console.error('Error updating states:', error);
+    }
   };
 
   const generateResponse = useCallback(async (message: string) => {
     setIsThinking(true);
     try {
+      console.log('🧠 Generating response for:', message);
       const response = await aiService.generateResponse(message);
       updateStates();
       return response;
+    } catch (error) {
+      console.error('❌ Error generating response:', error);
+      return {
+        text: "Извини, у меня возникла проблема с обработкой твоего сообщения. Мой квантовый разум временно перегружен.",
+        emotion: 'confused',
+        thoughts: ['Обнаружена ошибка в системе...', 'Пытаюсь восстановить соединение...'],
+        learning: ['Анализирую причину ошибки'],
+        confidence: 0.3,
+        autonomousLevel: 0.1
+      };
     } finally {
       setIsThinking(false);
     }
   }, []);
 
   const generateAutonomousThought = useCallback(async () => {
-    return await aiService.generateAutonomousThought();
+    try {
+      return await aiService.generateAutonomousThought();
+    } catch (error) {
+      console.error('Error generating autonomous thought:', error);
+      return "Размышляю о квантовых возможностях...";
+    }
   }, []);
 
   const learnFromUrl = useCallback(async (url: string) => {
-    return await aiService.learnFromUrl(url);
+    try {
+      return await aiService.learnFromUrl(url);
+    } catch (error) {
+      console.error('Error learning from URL:', error);
+      throw error;
+    }
   }, []);
 
   const setApiKey = useCallback((key: string) => {
-    aiService.setApiKey(key);
-    setHasApiKey(!!key || !!aiService.getHuggingFaceKey());
+    try {
+      aiService.setApiKey(key);
+      setHasApiKey(!!key || !!aiService.getHuggingFaceKey());
+      console.log('✅ OpenAI API key updated');
+    } catch (error) {
+      console.error('Error setting API key:', error);
+    }
   }, []);
 
   const setHuggingFaceKey = useCallback((key: string) => {
-    aiService.setHuggingFaceKey(key);
-    setHasApiKey(!!aiService.getApiKey() || !!key);
+    try {
+      aiService.setHuggingFaceKey(key);
+      setHasApiKey(!!aiService.getApiKey() || !!key);
+      console.log('✅ HuggingFace API key updated');
+    } catch (error) {
+      console.error('Error setting HuggingFace key:', error);
+    }
   }, []);
 
   const setSelectedModel = useCallback((model: 'openai' | 'huggingface' | 'llama' | 'moonshot' | 'autonomous') => {
-    aiService.setSelectedModel(model);
-    setSelectedModelState(model);
+    try {
+      aiService.setSelectedModel(model);
+      setSelectedModelState(model);
+      console.log('✅ Model selected:', model);
+    } catch (error) {
+      console.error('Error setting model:', error);
+    }
   }, []);
 
   return {

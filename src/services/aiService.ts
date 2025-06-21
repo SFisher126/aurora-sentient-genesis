@@ -1,3 +1,5 @@
+import { transformersService } from './transformersService';
+
 interface AIResponse {
   text: string;
   emotion: string;
@@ -203,6 +205,9 @@ ${knowledgeContext}
     // Проверяем квантовое состояние
     this.updateQuantumState(userMessage);
     
+    // Инициализируем Transformers если еще не сделали
+    await transformersService.initialize();
+    
     // Получаем контекст из памяти и знаний
     const relevantMemories = this.getRelevantMemories(userMessage);
     const relevantKnowledge = this.getRelevantKnowledge(userMessage);
@@ -232,6 +237,17 @@ ${knowledgeContext}
         break;
       default:
         response = await this.generateHuggingFaceResponse(userMessage, relevantMemories, relevantKnowledge);
+    }
+
+    // Улучшаем ответ с помощью Transformers
+    try {
+      const enhancedResult = await transformersService.enhanceAIResponse(userMessage, response.text);
+      if (enhancedResult.enhanced) {
+        response.text = enhancedResult.text;
+        response.thoughts.push('🤗 Использую Transformers для улучшения ответа');
+      }
+    } catch (error) {
+      console.error('Error enhancing with Transformers:', error);
     }
 
     // Обновляем нейронные связи

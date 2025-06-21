@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +12,7 @@ import { useRealAI } from '../hooks/useRealAI';
 import { useToast } from '@/hooks/use-toast';
 
 const APISettings = () => {
-  const [openaiKey, setOpenaiKey] = useState('');
+  const [openaiKey, setOpenaiKey] = useState('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');
   const [huggingfaceKey, setHuggingfaceKey] = useState('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');
   const [testResults, setTestResults] = useState<Record<string, string>>({});
   const [isTestingConnections, setIsTestingConnections] = useState(false);
@@ -31,17 +30,17 @@ const APISettings = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Автоматически устанавливаем новый HuggingFace ключ
-    const newKey = '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';
-    setHuggingfaceKey(newKey);
-    setHuggingFaceKey(newKey);
+    // Автоматически устанавливаем новые ключи
+    const newOpenAIKey = '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';
+    const newHFKey = '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';
     
-    // Загружаем сохраненные ключи
-    const savedOpenAI = localStorage.getItem('ai_api_key') || '';
-    setOpenaiKey(savedOpenAI);
+    setOpenaiKey(newOpenAIKey);
+    setHuggingfaceKey(newHFKey);
+    setApiKey(newOpenAIKey);
+    setHuggingFaceKey(newHFKey);
     
-    console.log('🔑 Updated HuggingFace key:', newKey);
-  }, [setHuggingFaceKey]);
+    console.log('🔑 API keys updated to latest versions');
+  }, [setApiKey, setHuggingFaceKey]);
 
   const handleSaveOpenAI = () => {
     setApiKey(openaiKey);

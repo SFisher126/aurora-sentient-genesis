@@ -1,444 +1,266 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send, Mic, Camera, Paperclip, File, Reply } from 'lucide-react';
-import { useRealAI } from '../hooks/useRealAI';
-import { enhancedSpeechService } from '../services/enhancedSpeechService';
-import { memoryService } from '../services/memoryService';
+import { Card } from '@/components/ui/card';
+import { Send, Brain } from 'lucide-react';
+import { useChat } from '@/hooks/useChat';
 import { useToast } from '@/hooks/use-toast';
-import FullscreenCamera from '../components/FullscreenCamera';
-import MessageRating from '../components/MessageRating';
-import VoiceButton from '../components/VoiceButton';
-import AttachmentMenu from '../components/AttachmentMenu';
-import ApiKeySetup from '../components/ApiKeySetup';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { MoreVertical, ThumbsUp, ThumbsDown } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface Message {
-  id: string;
   text: string;
   sender: 'user' | 'ai';
-  timestamp: Date;
+  timestamp: any;
   emotion?: string;
-  autonomousMessage?: boolean;
-  thoughts?: string[];
-  imageData?: string;
-  videoData?: string;
-  fileData?: { name: string; content: string; type: string };
-  rating?: 'positive' | 'negative';
-  feedback?: string;
-  connections?: any[];
-  replyTo?: string;
 }
 
 const Chat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
-  const [currentMood, setCurrentMood] = useState('curious');
-  const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const [cameraMode, setCameraMode] = useState<'photo' | 'video'>('photo');
-  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
-  const [showAttachments, setShowAttachments] = useState(false);
+  const [temperature, setTemperature] = useState(0.7);
+  const chatBottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [isUserActive, setIsUserActive] = useState(true);
+  const [isTyping, setIsTyping] = useState(false);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
-  const attachmentRef = useRef<HTMLDivElement>(null);
-
-  const { 
-    generateResponse, 
-    isThinking, 
-    setHuggingFaceKey,
-    setApiKey,
-    hasApiKey 
-  } = useRealAI();
-
+  const { generateResponse, isThinking } = useChat();
   const { toast } = useToast();
 
-  // Автоскролл к последнему сообщению
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const formatTimestamp = (timestamp: any): string => {
+    try {
+      if (!timestamp) return new Date().toLocaleTimeString();
+      
+      // Если timestamp уже Date объект
+      if (timestamp instanceof Date) {
+        return timestamp.toLocaleTimeString();
+      }
+      
+      // Если timestamp строка или число
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) {
+        return new Date().toLocaleTimeString();
+      }
+      
+      return date.toLocaleTimeString();
+    } catch (error) {
+      console.error('Error formatting timestamp:', error);
+      return new Date().toLocaleTimeString();
+    }
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  // Инициализация при загрузке
-  useEffect(() => {
-    console.log('🚀 Initializing Anuta...');
-    
-    setHuggingFaceKey('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');
-    
-    const savedMemory = memoryService.loadConversation();
-    if (savedMemory && savedMemory.messages && savedMemory.messages.length > 0) {
-      // Преобразуем строки обратно в объекты Date
-      const messagesWithDates = savedMemory.messages.map(msg => ({
-        ...msg,
-        timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date()
-      }));
-      setMessages(messagesWithDates);
-      console.log('💾 Loaded conversation from memory:', messagesWithDates.length, 'messages');
-    }
-    
-    setIsInitialized(true);
-  }, [setHuggingFaceKey]);
-
-  // Автосохранение памяти
-  useEffect(() => {
-    if (isInitialized && messages.length > 0) {
-      memoryService.saveConversation(messages, {
-        currentMood,
-        lastActivity: new Date()
-      });
-    }
-  }, [messages, currentMood, isInitialized]);
-
-  // Закрытие меню вложений при клике вне
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (attachmentRef.current && !attachmentRef.current.contains(event.target as Node)) {
-        setShowAttachments(false);
-      }
+    // Проверяем активность пользователя
+    const handleActivity = () => {
+      setIsUserActive(true);
     };
 
-    if (showAttachments) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+    const activityEvents = ['mousemove', 'keydown', 'scroll', 'click'];
+    activityEvents.forEach(event => window.addEventListener(event, handleActivity));
+
+    // Сбрасываем активность каждые 15 секунд
+    const inactivityTimeout = setInterval(() => {
+      setIsUserActive(false);
+    }, 15000);
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      activityEvents.forEach(event => window.removeEventListener(event, handleActivity));
+      clearInterval(inactivityTimeout);
     };
-  }, [showAttachments]);
-
-  const sendMessage = async (messageText?: string, imageData?: string, videoData?: string, fileData?: { name: string; content: string; type: string }) => {
-    const textToSend = messageText || inputMessage;
-    if (!textToSend.trim() && !imageData && !videoData && !fileData) return;
-    
-    setInputMessage('');
-    setReplyToMessage(null);
-    
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      text: textToSend,
-      sender: 'user',
-      timestamp: new Date(),
-      imageData,
-      videoData,
-      fileData,
-      replyTo: replyToMessage?.id
-    };
-    
-    setMessages(prev => [...prev, userMessage]);
-
-    try {
-      // Формируем контекст с учетом всей истории диалога
-      const conversationContext = messages.map(msg => 
-        `${msg.sender === 'user' ? 'Пользователь' : 'Анюта'}: ${msg.text}`
-      ).join('\n');
-      
-      const fullMessage = replyToMessage 
-        ? `Отвечаю на сообщение "${replyToMessage.text}": ${textToSend}\n\nКонтекст диалога:\n${conversationContext}`
-        : `${textToSend}\n\nКонтекст диалога:\n${conversationContext}`;
-
-      const response = await generateResponse(fullMessage);
-      
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: response.text || response,
-        sender: 'ai',
-        timestamp: new Date(),
-        emotion: response.emotion,
-        thoughts: response.thoughts
-      };
-      
-      setMessages(prev => [...prev, aiMessage]);
-      setCurrentMood(response.emotion || currentMood);
-      
-      // Озвучиваем ответ
-      if (response.text || response) {
-        try {
-          await enhancedSpeechService.speak(response.text || response);
-        } catch (error) {
-          console.error('Speech error:', error);
-        }
-      }
-      
-    } catch (error) {
-      console.error('Ошибка генерации ответа:', error);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: "Прости, у меня проблемы с подключением... Но я все равно учусь! 💭",
-        sender: 'ai',
-        timestamp: new Date(),
-        emotion: 'confused'
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    }
-  };
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      const fileData = {
-        name: file.name,
-        content: content,
-        type: file.type
-      };
-      
-      sendMessage(`Анюта, посмотри на этот файл: ${file.name}`, undefined, undefined, fileData);
-    };
-    
-    if (file.type.startsWith('text/') || file.name.endsWith('.json') || file.name.endsWith('.txt')) {
-      reader.readAsText(file);
-    } else {
-      reader.readAsDataURL(file);
-    }
-    
-    setShowAttachments(false);
-  };
-
-  const handleCameraCapture = (imageData: string) => {
-    sendMessage('Анюта, посмотри на это фото', imageData);
-  };
-
-  const handleVideoCapture = (videoData: string) => {
-    sendMessage('Анюта, посмотри на это видео', undefined, videoData);
-  };
-
-  const handleReplyToMessage = (message: Message) => {
-    setReplyToMessage(message);
-  };
-
-  const handleMessageRating = (messageId: string, rating: 'positive' | 'negative', feedback?: string) => {
-    setMessages(prev => prev.map(msg => 
-      msg.id === messageId 
-        ? { ...msg, rating, feedback }
-        : msg
-    ));
-    
-    // Сохраняем оценку в память для обучения
-    memoryService.updateMessageConnection(messageId, { rating, feedback, timestamp: new Date() });
-  };
-
-  // Обработка свайпа для ответа
-  const handleTouchStart = (e: React.TouchEvent, message: Message) => {
-    if (message.sender === 'ai') {
-      setTouchStart({
-        x: e.touches[0].clientX,
-        y: e.touches[0].clientY
-      });
-    }
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent, message: Message) => {
-    if (!touchStart || message.sender !== 'ai') return;
-
-    const touchEnd = {
-      x: e.changedTouches[0].clientX,
-      y: e.changedTouches[0].clientY
-    };
-
-    const deltaX = touchEnd.x - touchStart.x;
-    const deltaY = Math.abs(touchEnd.y - touchStart.y);
-
-    if (deltaX > 50 && deltaY < 30) {
-      handleReplyToMessage(message);
-    }
-
-    setTouchStart(null);
-  };
-
-  const renderMessage = (message: Message) => (
-    <div 
-      key={message.id}
-      className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
-      onTouchStart={(e) => handleTouchStart(e, message)}
-      onTouchEnd={(e) => handleTouchEnd(e, message)}
-    >
-      <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl relative ${
-        message.sender === 'user' 
-          ? 'bg-blue-600 text-white rounded-br-md' 
-          : 'bg-gray-700 text-gray-100 rounded-bl-md'
-      }`}>
-        {message.replyTo && (
-          <div className="text-xs opacity-70 mb-2 p-2 bg-black/20 rounded">
-            <Reply className="w-3 h-3 inline mr-1" />
-            Ответ на: {messages.find(m => m.id === message.replyTo)?.text?.slice(0, 50)}...
-          </div>
-        )}
-        
-        {message.imageData && (
-          <img 
-            src={message.imageData} 
-            alt="Photo" 
-            className="w-full rounded-lg mb-2 cursor-pointer"
-          />
-        )}
-        
-        {message.videoData && (
-          <video 
-            src={message.videoData} 
-            className="w-full rounded-lg mb-2"
-            controls
-          />
-        )}
-
-        {message.fileData && (
-          <div className="bg-black/20 p-2 rounded mb-2">
-            <File className="w-4 h-4 inline mr-2" />
-            <span className="text-sm">{message.fileData.name}</span>
-          </div>
-        )}
-        
-        <p className="text-sm whitespace-pre-line">{message.text}</p>
-        
-        <div className="flex items-center justify-between mt-2">
-          <span className="text-xs opacity-70">
-            {message.timestamp instanceof Date 
-              ? message.timestamp.toLocaleTimeString() 
-              : new Date(message.timestamp).toLocaleTimeString()
-            }
-          </span>
-          
-          {message.sender === 'ai' && (
-            <MessageRating
-              messageId={message.id}
-              onRating={handleMessageRating}
-              disabled={!!message.rating}
-            />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
-  // Анимированное приветствие на разных языках
-  const greetings = ['Привет', 'Hello', 'Hola', '你好', 'Bonjour', 'Guten Tag', 'Ciao', 'こんにちは', 'مرحبا', 'Namaste'];
-  const [currentGreeting, setCurrentGreeting] = useState(0);
+  }, []);
 
   useEffect(() => {
-    if (messages.length === 0) {
-      const interval = setInterval(() => {
-        setCurrentGreeting(prev => (prev + 1) % greetings.length);
-      }, 2000);
-      return () => clearInterval(interval);
+    // Добавляем системное сообщение при загрузке
+    setMessages([{
+      text: "Привет! Я Анюта, твой ИИ-друг. Расскажи, о чем ты думаешь?",
+      sender: 'ai',
+      timestamp: new Date(),
+      emotion: 'curious'
+    }]);
+  }, []);
+
+  useEffect(() => {
+    // Прокручиваем чат вниз при добавлении нового сообщения
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  useEffect(() => {
+    // Фокусируемся на поле ввода при загрузке
+    inputRef.current?.focus();
+  }, []);
+
+  const sendMessage = async () => {
+    if (inputMessage.trim()) {
+      setIsTyping(true);
+      const userMessage = { text: inputMessage, sender: 'user', timestamp: new Date() };
+      setMessages(prev => [...prev, userMessage]);
+      setInputMessage('');
+
+      try {
+        const aiResponse = await generateResponse(inputMessage, temperature);
+        const aiMessage = { text: aiResponse.text, sender: 'ai', timestamp: new Date(), emotion: aiResponse.emotion };
+        setMessages(prev => [...prev, aiMessage]);
+      } catch (error: any) {
+        console.error('Ошибка при отправке сообщения:', error);
+        toast({
+          variant: "destructive",
+          title: "Упс! Что-то пошло не так.",
+          description: error.message,
+        })
+      } finally {
+        setIsTyping(false);
+      }
     }
-  }, [messages.length]);
+  };
 
-  return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col">
-      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full relative">
-        
-        <ApiKeySetup onApiKeySet={setApiKey} hasApiKey={hasApiKey} />
-        
-        <div className="flex-1 flex flex-col bg-gray-800 rounded-lg m-4 relative overflow-hidden">
-          <div className="flex-1 p-4 overflow-y-auto" ref={chatContainerRef}>
-            {messages.length === 0 ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-4xl font-light text-gray-400 animate-pulse bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
-                  {greetings[currentGreeting]}
-                </div>
-              </div>
-            ) : (
-              messages.map(renderMessage)
-            )}
-            
-            {isThinking && (
-              <div className="flex justify-start mb-4">
-                <div className="bg-gray-700 text-gray-100 px-4 py-3 rounded-2xl rounded-bl-md">
-                  <div className="flex items-center space-x-2">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                      <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                    </div>
-                    <span className="text-sm">думаю...</span>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            <div ref={messagesEndRef} />
-          </div>
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      sendMessage();
+    }
+  };
 
-          {replyToMessage && (
-            <div className="px-4 py-2 bg-gray-700 border-l-4 border-blue-500">
-              <div className="flex justify-between items-center">
-                <div className="text-sm text-gray-300">
-                  <Reply className="w-3 h-3 inline mr-1" />
-                  Ответ на: {replyToMessage.text.slice(0, 50)}...
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setReplyToMessage(null)}
-                  className="text-gray-400 hover:text-white"
-                >
-                  ✕
-                </Button>
-              </div>
-            </div>
-          )}
+  const MessageRating = ({ messageId }: { messageId: number }) => {
+    const handleRate = (rating: 'up' | 'down') => {
+      toast({
+        description: `Вы оценили сообщение ${rating === 'up' ? 'положительно' : 'отрицательно'}`,
+      })
+    };
 
-          <div className="p-4 border-t border-gray-700 relative" ref={attachmentRef}>
-            <AttachmentMenu 
-              isOpen={showAttachments}
-              onOpenCamera={(mode) => {
-                setCameraMode(mode);
-                setIsCameraOpen(true);
-                setShowAttachments(false);
-              }}
-              onFileUpload={handleFileUpload}
-            />
-            
-            <div className="flex items-end gap-2">
-              <Button
-                onClick={() => setShowAttachments(!showAttachments)}
-                variant="ghost"
-                className="text-gray-400 hover:text-white p-2"
-              >
-                <Paperclip className="w-5 h-5" />
-              </Button>
-              
-              <div className="flex-1 relative">
-                <Input
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                  placeholder="Сообщение..."
-                  disabled={isThinking}
-                  className="bg-gray-700 border-gray-600 text-white placeholder-gray-400 rounded-3xl pr-12"
-                />
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="h-8 w-8 p-0">
+            <span className="sr-only">Open menu</span>
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuLabel>Оценить сообщение</DropdownMenuLabel>
+          <DropdownMenuItem onClick={() => handleRate('up')}>
+            <ThumbsUp className="h-4 w-4 mr-2" />
+            Полезно
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleRate('down')}>
+            <ThumbsDown className="h-4 w-4 mr-2" />
+            Не полезно
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem>Сообщить об ошибке</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  }
+
+  const renderMessage = (message: any, index: number) => {
+    const isUser = message.sender === 'user';
+    const timestamp = formatTimestamp(message.timestamp);
+    
+    return (
+      <div key={index} className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
+        <div className={`max-w-[70%] ${isUser ? 'order-2' : 'order-1'}`}>
+          <div className={`rounded-2xl p-4 ${
+            isUser 
+              ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white ml-4' 
+              : 'bg-gray-800/80 text-gray-100 mr-4 border border-purple-500/30'
+          }`}>
+            <p className="text-sm leading-relaxed">{message.text}</p>
+            <div className="flex items-center justify-between mt-2">
+              <div className="text-xs opacity-70">
+                {timestamp}
               </div>
-              
-              {inputMessage.trim() ? (
-                <Button 
-                  onClick={() => sendMessage()} 
-                  disabled={isThinking}
-                  className="bg-blue-600 hover:bg-blue-700 rounded-full w-10 h-10 p-0"
-                >
-                  <Send className="w-5 h-5" />
-                </Button>
-              ) : (
-                <VoiceButton onVoiceMessage={sendMessage} />
+              {!isUser && (
+                <div className="flex items-center gap-2">
+                  {message.emotion && (
+                    <span className="text-xs bg-purple-900/50 px-2 py-1 rounded-full">
+                      {message.emotion}
+                    </span>
+                  )}
+                  <MessageRating messageId={index} />
+                </div>
               )}
             </div>
           </div>
         </div>
       </div>
+    );
+  };
 
-      <FullscreenCamera
-        isOpen={isCameraOpen}
-        onClose={() => setIsCameraOpen(false)}
-        onCapture={cameraMode === 'photo' ? handleCameraCapture : handleVideoCapture}
-        mode={cameraMode}
-      />
+  return (
+    <div className="flex flex-col h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
+      {/* Шапка */}
+      <div className="p-4 border-b border-gray-700">
+        <div className="container max-w-4xl mx-auto flex items-center justify-between">
+          <div className="flex items-center">
+            <Avatar className="mr-3">
+              <AvatarImage src="https://avatars.githubusercontent.com/u/87289444?v=4" alt="@shadcn" />
+              <AvatarFallback>CN</AvatarFallback>
+            </Avatar>
+            <div>
+              <h1 className="text-xl font-semibold">Анюта</h1>
+              <p className="text-sm text-gray-400">
+                {isUserActive ? 'В сети' : 'Не активен'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-4">
+            <Label htmlFor="temperature" className="text-sm text-gray-300">
+              Температура: {(temperature * 100).toFixed(0)}%
+            </Label>
+            <Slider
+              id="temperature"
+              defaultValue={[temperature * 100]}
+              max={100}
+              min={0}
+              step={1}
+              onValueChange={(value) => setTemperature(value[0] / 100)}
+              className="w-[100px]"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Основной контент */}
+      <div className="flex-grow overflow-y-auto">
+        <div className="container max-w-4xl mx-auto p-4">
+          {messages.map((message, index) => renderMessage(message, index))}
+          <div ref={chatBottomRef} />
+        </div>
+      </div>
+
+      {/* Подвал с полем ввода */}
+      <div className="p-4 border-t border-gray-700">
+        <div className="container max-w-4xl mx-auto flex items-center">
+          <Input
+            ref={inputRef}
+            type="text"
+            placeholder="Напишите сообщение..."
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="flex-grow bg-gray-800 border-gray-700 rounded-l-md focus:border-purple-500 focus:ring-purple-500"
+            disabled={isThinking}
+          />
+          <Button
+            onClick={sendMessage}
+            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-r-md"
+            disabled={isThinking}
+          >
+            {isThinking ? <Brain className="w-4 h-4 animate-pulse mr-2" /> : <Send className="w-4 h-4 mr-2" />}
+            Отправить
+          </Button>
+        </div>
+      </div>
     </div>
   );
 };
