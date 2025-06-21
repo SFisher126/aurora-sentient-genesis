@@ -36,7 +36,7 @@ interface NeuralConnection {
 class AIService {
   private apiKey: string = '';
   private huggingFaceKey: string = '';
-  private selectedModel: 'openai' | 'huggingface' | 'llama' | 'moonshot' | 'autonomous' = 'autonomous';
+  private selectedModel: 'openai' | 'huggingface' | 'llama' | 'moonshot' | 'autonomous' = 'openai';
   private baseURL: string = 'https://api.openai.com/v1';
   
   // Память и обучение
@@ -65,34 +65,43 @@ class AIService {
   setApiKey(key: string) {
     this.apiKey = key;
     localStorage.setItem('ai_api_key', key);
-    console.log('💾 OpenAI API key saved to localStorage');
+    console.log('💾 OpenAI API key saved:', key.substring(0, 10) + '...');
   }
 
   setHuggingFaceKey(key: string) {
     this.huggingFaceKey = key;
     localStorage.setItem('hf_api_key', key);
-    console.log('💾 HuggingFace API key saved to localStorage');
+    console.log('💾 HuggingFace API key saved:', key.substring(0, 10) + '...');
   }
 
   setSelectedModel(model: 'openai' | 'huggingface' | 'llama' | 'moonshot' | 'autonomous') {
     this.selectedModel = model;
     localStorage.setItem('selected_model', model);
-    console.log('💾 Selected model saved to localStorage:', model);
+    console.log('💾 Selected model saved:', model);
   }
 
   getApiKey(): string {
-    const stored = localStorage.getItem('ai_api_key');
-    return this.apiKey || stored || '';
+    if (this.apiKey) return this.apiKey;
+    const stored = localStorage.getItem('ai_api_key') || '';
+    this.apiKey = stored;
+    return stored;
   }
 
   getHuggingFaceKey(): string {
-    const stored = localStorage.getItem('hf_api_key');
-    return this.huggingFaceKey || stored || '';
+    if (this.huggingFaceKey) return this.huggingFaceKey;
+    const stored = localStorage.getItem('hf_api_key') || '';
+    this.huggingFaceKey = stored;
+    return stored;
   }
 
   getSelectedModel(): 'openai' | 'huggingface' | 'llama' | 'moonshot' | 'autonomous' {
+    if (this.selectedModel !== 'openai') return this.selectedModel;
     const stored = localStorage.getItem('selected_model') as any;
-    return this.selectedModel || stored || 'autonomous';
+    if (stored) {
+      this.selectedModel = stored;
+      return stored;
+    }
+    return 'openai';
   }
 
   private buildSystemPrompt(memories: any[], knowledge: LearningData[]): string {
@@ -126,7 +135,8 @@ ${knowledgeContext}
 
   async generateResponse(userMessage: string): Promise<AIResponse> {
     console.log('🧠 AI Service: Generating response for:', userMessage);
-    console.log('🎯 Current model:', this.getSelectedModel());
+    const currentModel = this.getSelectedModel();
+    console.log('🎯 Current model:', currentModel);
     
     // Обновляем квантовое состояние
     this.updateQuantumState(userMessage);
@@ -136,7 +146,6 @@ ${knowledgeContext}
     const relevantKnowledge = this.getRelevantKnowledge(userMessage);
     
     let response: AIResponse;
-    const currentModel = this.getSelectedModel();
     
     try {
       switch (currentModel) {
@@ -164,8 +173,7 @@ ${knowledgeContext}
       }
     } catch (error) {
       console.error(`❌ Error with ${currentModel} model:`, error);
-      console.log('🔄 Falling back to autonomous mode');
-      response = await this.generateAutonomousResponse(userMessage, relevantMemories, relevantKnowledge);
+      throw error; // НЕ fallback на автономный режим - пусть ошибка передается дальше
     }
 
     // Обновляем нейронные связи и память
@@ -178,8 +186,10 @@ ${knowledgeContext}
 
   private async generateOpenAIResponse(userMessage: string, memories: any[], knowledge: LearningData[]): Promise<AIResponse> {
     const apiKey = this.getApiKey();
-    if (!apiKey) {
-      throw new Error('OpenAI API key не установлен');
+    console.log('🔑 Using OpenAI API key:', apiKey ? apiKey.substring(0, 10) + '...' : 'NOT SET');
+    
+    if (!apiKey || !apiKey.startsWith('sk-')) {
+      throw new Error('OpenAI API ключ не установлен или неверный');
     }
 
     const systemPrompt = this.buildSystemPrompt(memories, knowledge);
@@ -221,12 +231,14 @@ ${knowledgeContext}
 
   private async generateHuggingFaceResponse(userMessage: string, memories: any[], knowledge: LearningData[]): Promise<AIResponse> {
     const apiKey = this.getHuggingFaceKey();
-    if (!apiKey) {
-      throw new Error('HuggingFace API key не установлен');
+    console.log('🔑 Using HuggingFace API key:', apiKey ? apiKey.substring(0, 10) + '...' : 'NOT SET');
+    
+    if (!apiKey || !apiKey.startsWith('hf_')) {
+      throw new Error('HuggingFace API ключ не установлен или неверный');
     }
 
-    // Используем простую модель для текста
-    const response = await fetch('https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium', {
+    // Используем модель для генерации текста
+    const response = await fetch('https://api-inference.huggingface.co/models/microsoft/DialoGPT-small', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -235,22 +247,29 @@ ${knowledgeContext}
       body: JSON.stringify({
         inputs: userMessage,
         parameters: {
-          max_length: 100,
-          temperature: 0.8
+          max_new_tokens: 100,
+          temperature: 0.8,
+          do_sample: true
         }
       }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`HuggingFace API Error ${response.status}: ${errorData.error || 'Unknown error'}`);
+      const errorText = await response.text();
+      throw new Error(`HuggingFace API Error ${response.status}: ${errorText}`);
     }
 
     const data = await response.json();
-    const aiText = data[0]?.generated_text || `Понимаю твое сообщение "${userMessage}". Думаю над ответом...`;
+    let aiText = '';
+    
+    if (Array.isArray(data) && data[0]?.generated_text) {
+      aiText = data[0].generated_text.replace(userMessage, '').trim();
+    } else {
+      aiText = `Понимаю твое сообщение "${userMessage}". Думаю над ответом...`;
+    }
 
     return {
-      text: aiText,
+      text: aiText || `Отвечаю на "${userMessage}" через HuggingFace API.`,
       emotion: this.analyzeEmotionLocal(aiText),
       thoughts: this.generateThoughtsLocal(userMessage, aiText),
       learning: this.extractLearningLocal(userMessage, aiText),
@@ -260,12 +279,12 @@ ${knowledgeContext}
   }
 
   private async generateLlamaResponse(userMessage: string, memories: any[], knowledge: LearningData[]): Promise<AIResponse> {
-    // Заглушка для Llama - пока используем локальную обработку
+    // Пока недоступно - выбрасываем ошибку
     throw new Error('Llama model временно недоступна');
   }
 
   private async generateMoonshotResponse(userMessage: string, memories: any[], knowledge: LearningData[]): Promise<AIResponse> {
-    // Заглушка для Moonshot - пока используем локальную обработку  
+    // Пока недоступно - выбрасываем ошибку
     throw new Error('Moonshot model временно недоступна');
   }
 

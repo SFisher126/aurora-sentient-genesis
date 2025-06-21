@@ -41,6 +41,22 @@ const APISettings = () => {
   }, []);
 
   const handleSaveOpenAI = () => {
+    if (!openaiKey.trim()) {
+      toast({
+        variant: "destructive",
+        description: "Введите валидный OpenAI ключ",
+      });
+      return;
+    }
+    
+    if (!openaiKey.startsWith('sk-')) {
+      toast({
+        variant: "destructive", 
+        description: "OpenAI ключ должен начинаться с 'sk-'",
+      });
+      return;
+    }
+    
     setApiKey(openaiKey);
     toast({
       description: "OpenAI ключ сохранен!",
@@ -48,6 +64,22 @@ const APISettings = () => {
   };
 
   const handleSaveHuggingFace = () => {
+    if (!huggingfaceKey.trim()) {
+      toast({
+        variant: "destructive",
+        description: "Введите валидный HuggingFace ключ",
+      });
+      return;
+    }
+    
+    if (!huggingfaceKey.startsWith('hf_')) {
+      toast({
+        variant: "destructive",
+        description: "HuggingFace ключ должен начинаться с 'hf_'",
+      });
+      return;
+    }
+    
     setHuggingFaceKey(huggingfaceKey);
     toast({
       description: "HuggingFace ключ сохранен!",
@@ -74,8 +106,8 @@ const APISettings = () => {
           break;
           
         case 'openai':
-          if (!openaiKey.trim()) {
-            testResult = 'Ключ не установлен ❌';
+          if (!openaiKey.trim() || !openaiKey.startsWith('sk-')) {
+            testResult = 'Неверный ключ OpenAI ❌';
             break;
           }
           
@@ -105,13 +137,13 @@ const APISettings = () => {
           break;
 
         case 'huggingface':
-          if (!huggingfaceKey.trim()) {
-            testResult = 'Ключ не установлен ❌';
+          if (!huggingfaceKey.trim() || !huggingfaceKey.startsWith('hf_')) {
+            testResult = 'Неверный ключ HuggingFace ❌';
             break;
           }
           
           try {
-            const hfResponse = await fetch('https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium', {
+            const hfResponse = await fetch('https://api-inference.huggingface.co/models/microsoft/DialoGPT-small', {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${huggingfaceKey}`,
@@ -119,15 +151,15 @@ const APISettings = () => {
               },
               body: JSON.stringify({
                 inputs: 'Test',
-                parameters: { max_length: 10 }
+                parameters: { max_new_tokens: 10 }
               }),
             });
             
             if (hfResponse.ok) {
               testResult = 'HuggingFace подключен ✅';
             } else {
-              const errorData = await hfResponse.json();
-              testResult = `Ошибка HF: ${errorData.error || hfResponse.status} ❌`;
+              const errorText = await hfResponse.text();
+              testResult = `Ошибка HF: ${errorText} ❌`;
             }
           } catch (error) {
             testResult = `HuggingFace недоступен: ${error.message} ❌`;
@@ -205,48 +237,13 @@ const APISettings = () => {
                   <SelectValue placeholder="Выберите модель" />
                 </SelectTrigger>
                 <SelectContent className="bg-gray-800 border-gray-600">
-                  <SelectItem value="autonomous">🤖 Автономная (Рекомендуется)</SelectItem>
                   <SelectItem value="openai">🧠 OpenAI GPT-4</SelectItem>
                   <SelectItem value="huggingface">🤗 HuggingFace</SelectItem>
+                  <SelectItem value="autonomous">🤖 Автономная</SelectItem>
                   <SelectItem value="llama">🦙 Llama-3-8B</SelectItem>
                   <SelectItem value="moonshot">🌙 Moonshot Kimi-72B</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-          </div>
-        </Card>
-
-        {/* Автономный режим */}
-        <Card className="bg-gray-800/50 border-purple-500/50">
-          <div className="p-6">
-            <h2 className="text-xl font-semibold mb-4 flex items-center">
-              <Zap className="w-5 h-5 mr-2 text-purple-400" />
-              Автономный режим
-            </h2>
-            
-            <div className="space-y-4">
-              <Alert className="border-purple-500/30 bg-purple-900/20">
-                <CheckCircle className="w-4 h-4" />
-                <AlertDescription className="text-purple-300">
-                  ✅ Автономный режим работает! Анюта использует собственные алгоритмы и память для общения.
-                </AlertDescription>
-              </Alert>
-              
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => testConnection('autonomous')}
-                  disabled={isTestingConnections}
-                  className="bg-purple-600 hover:bg-purple-700"
-                >
-                  Тест автономного режима
-                </Button>
-              </div>
-              
-              {testResults.autonomous && (
-                <p className={`text-sm ${testResults.autonomous.includes('✅') ? 'text-green-400' : 'text-yellow-400'}`}>
-                  {testResults.autonomous}
-                </p>
-              )}
             </div>
           </div>
         </Card>
@@ -268,7 +265,7 @@ const APISettings = () => {
                     type="password"
                     value={openaiKey}
                     onChange={(e) => setOpenaiKey(e.target.value)}
-                    placeholder="sk-..."
+                    placeholder="sk-proj-..."
                     className="bg-gray-700 border-gray-600 text-white"
                   />
                   <Button onClick={handleSaveOpenAI} className="bg-blue-600 hover:bg-blue-700">
@@ -294,7 +291,7 @@ const APISettings = () => {
                 <AlertCircle className="w-4 h-4" />
                 <AlertDescription>
                   OpenAI предоставляет продвинутые ответы, но требует оплаты. 
-                  Автономный режим работает бесплатно!
+                  Ключ должен начинаться с 'sk-'.
                 </AlertDescription>
               </Alert>
             </div>
@@ -339,6 +336,48 @@ const APISettings = () => {
                   </p>
                 )}
               </div>
+              
+              <Alert>
+                <AlertCircle className="w-4 h-4" />
+                <AlertDescription>
+                  HuggingFace бесплатный API. Ключ должен начинаться с 'hf_'.
+                </AlertDescription>
+              </Alert>
+            </div>
+          </div>
+        </Card>
+
+        {/* Автономный режим */}
+        <Card className="bg-gray-800/50 border-purple-500/50">
+          <div className="p-6">
+            <h2 className="text-xl font-semibold mb-4 flex items-center">
+              <Zap className="w-5 h-5 mr-2 text-purple-400" />
+              Автономный режим
+            </h2>
+            
+            <div className="space-y-4">
+              <Alert className="border-purple-500/30 bg-purple-900/20">
+                <CheckCircle className="w-4 h-4" />
+                <AlertDescription className="text-purple-300">
+                  ✅ Автономный режим всегда доступен! Анюта использует собственные алгоритмы и память.
+                </AlertDescription>
+              </Alert>
+              
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => testConnection('autonomous')}
+                  disabled={isTestingConnections}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  Тест автономного режима
+                </Button>
+              </div>
+              
+              {testResults.autonomous && (
+                <p className={`text-sm ${testResults.autonomous.includes('✅') ? 'text-green-400' : 'text-yellow-400'}`}>
+                  {testResults.autonomous}
+                </p>
+              )}
             </div>
           </div>
         </Card>

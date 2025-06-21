@@ -19,7 +19,7 @@ interface UseRealAIReturn {
 export const useRealAI = (): UseRealAIReturn => {
   const [isThinking, setIsThinking] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
-  const [selectedModel, setSelectedModelState] = useState<'openai' | 'huggingface' | 'llama' | 'moonshot' | 'autonomous'>('autonomous');
+  const [selectedModel, setSelectedModelState] = useState<'openai' | 'huggingface' | 'llama' | 'moonshot' | 'autonomous'>('openai');
   const [quantumState, setQuantumState] = useState(aiService.getQuantumState());
   const [rewardSystem, setRewardSystem] = useState(aiService.getRewardSystem());
 
@@ -28,7 +28,7 @@ export const useRealAI = (): UseRealAIReturn => {
       console.log('🔧 Initializing AI service...');
       aiService.loadFromStorage();
       
-      // Получаем сохраненную модель, НЕ принудительно устанавливаем autonomous
+      // Получаем сохраненную модель и ключи
       const savedModel = aiService.getSelectedModel();
       const savedApiKey = aiService.getApiKey();
       const savedHfKey = aiService.getHuggingFaceKey();
@@ -38,10 +38,9 @@ export const useRealAI = (): UseRealAIReturn => {
       updateStates();
       
       console.log('✅ AI service initialized with model:', savedModel);
+      console.log('🔑 Has API keys:', !!savedApiKey, !!savedHfKey);
     } catch (error) {
       console.error('❌ Error loading AI service:', error);
-      setSelectedModelState('autonomous');
-      setHasApiKey(false);
     }
   }, []);
 
@@ -64,14 +63,9 @@ export const useRealAI = (): UseRealAIReturn => {
       return response;
     } catch (error) {
       console.error('❌ Error generating response:', error);
-      return {
-        text: `Извини, произошла ошибка: ${error.message}`,
-        emotion: 'confused',
-        thoughts: ['Обрабатываю ошибку...'],
-        learning: ['Анализирую проблему'],
-        confidence: 0.5,
-        autonomousLevel: 1.0
-      };
+      
+      // Возвращаем ошибку вместо fallback на автономный режим
+      throw new Error(`Ошибка ${aiService.getSelectedModel()}: ${error.message}`);
     } finally {
       setIsThinking(false);
     }
