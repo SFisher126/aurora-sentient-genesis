@@ -24,10 +24,14 @@ export const useRealAI = (): UseRealAIReturn => {
   const [rewardSystem, setRewardSystem] = useState(aiService.getRewardSystem());
 
   useEffect(() => {
-    aiService.loadFromStorage();
-    setHasApiKey(!!aiService.getApiKey());
-    setSelectedModelState(aiService.getSelectedModel());
-    updateStates();
+    try {
+      aiService.loadFromStorage();
+      setHasApiKey(!!aiService.getApiKey());
+      setSelectedModelState(aiService.getSelectedModel());
+      updateStates();
+    } catch (error) {
+      console.error('Error loading AI service:', error);
+    }
   }, []);
 
   const updateStates = () => {

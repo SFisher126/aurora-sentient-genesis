@@ -12,6 +12,7 @@ import FullscreenCamera from '../components/FullscreenCamera';
 import MessageRating from '../components/MessageRating';
 import VoiceButton from '../components/VoiceButton';
 import AttachmentMenu from '../components/AttachmentMenu';
+import ApiKeySetup from '../components/ApiKeySetup';
 
 interface Message {
   id: string;
@@ -49,6 +50,7 @@ const Chat = () => {
     generateResponse, 
     isThinking, 
     setHuggingFaceKey,
+    setApiKey,
     hasApiKey 
   } = useRealAI();
 
@@ -71,8 +73,13 @@ const Chat = () => {
     
     const savedMemory = memoryService.loadConversation();
     if (savedMemory && savedMemory.messages && savedMemory.messages.length > 0) {
-      setMessages(savedMemory.messages);
-      console.log('💾 Loaded conversation from memory:', savedMemory.messages.length, 'messages');
+      // Преобразуем строки обратно в объекты Date
+      const messagesWithDates = savedMemory.messages.map(msg => ({
+        ...msg,
+        timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date()
+      }));
+      setMessages(messagesWithDates);
+      console.log('💾 Loaded conversation from memory:', messagesWithDates.length, 'messages');
     }
     
     setIsInitialized(true);
@@ -139,7 +146,7 @@ const Chat = () => {
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: response.text,
+        text: response.text || response,
         sender: 'ai',
         timestamp: new Date(),
         emotion: response.emotion,
@@ -147,12 +154,12 @@ const Chat = () => {
       };
       
       setMessages(prev => [...prev, aiMessage]);
-      setCurrentMood(response.emotion);
+      setCurrentMood(response.emotion || currentMood);
       
       // Озвучиваем ответ
-      if (response.text) {
+      if (response.text || response) {
         try {
-          await enhancedSpeechService.speak(response.text);
+          await enhancedSpeechService.speak(response.text || response);
         } catch (error) {
           console.error('Speech error:', error);
         }
@@ -293,7 +300,10 @@ const Chat = () => {
         
         <div className="flex items-center justify-between mt-2">
           <span className="text-xs opacity-70">
-            {message.timestamp.toLocaleTimeString()}
+            {message.timestamp instanceof Date 
+              ? message.timestamp.toLocaleTimeString() 
+              : new Date(message.timestamp).toLocaleTimeString()
+            }
           </span>
           
           {message.sender === 'ai' && (
@@ -324,6 +334,8 @@ const Chat = () => {
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col">
       <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full relative">
+        
+        <ApiKeySetup onApiKeySet={setApiKey} hasApiKey={hasApiKey} />
         
         <div className="flex-1 flex flex-col bg-gray-800 rounded-lg m-4 relative overflow-hidden">
           <div className="flex-1 p-4 overflow-y-auto" ref={chatContainerRef}>
