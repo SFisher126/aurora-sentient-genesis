@@ -21,7 +21,7 @@ import {
 interface Message {
   text: string;
   sender: 'user' | 'ai';
-  timestamp: any;
+  timestamp: Date;
   emotion?: string;
 }
 
@@ -37,7 +37,7 @@ const Chat = () => {
   const { generateResponse, isThinking } = useChat();
   const { toast } = useToast();
 
-  const formatTimestamp = (timestamp: any): string => {
+  const formatTimestamp = (timestamp: Date): string => {
     try {
       if (!timestamp) return new Date().toLocaleTimeString();
       
@@ -102,13 +102,22 @@ const Chat = () => {
   const sendMessage = async () => {
     if (inputMessage.trim()) {
       setIsTyping(true);
-      const userMessage = { text: inputMessage, sender: 'user', timestamp: new Date() };
+      const userMessage: Message = { 
+        text: inputMessage, 
+        sender: 'user' as const, 
+        timestamp: new Date() 
+      };
       setMessages(prev => [...prev, userMessage]);
       setInputMessage('');
 
       try {
         const aiResponse = await generateResponse(inputMessage, temperature);
-        const aiMessage = { text: aiResponse.text, sender: 'ai', timestamp: new Date(), emotion: aiResponse.emotion };
+        const aiMessage: Message = { 
+          text: aiResponse.text, 
+          sender: 'ai' as const, 
+          timestamp: new Date(), 
+          emotion: aiResponse.emotion 
+        };
         setMessages(prev => [...prev, aiMessage]);
       } catch (error: any) {
         console.error('Ошибка при отправке сообщения:', error);
@@ -162,7 +171,7 @@ const Chat = () => {
     )
   }
 
-  const renderMessage = (message: any, index: number) => {
+  const renderMessage = (message: Message, index: number) => {
     const isUser = message.sender === 'user';
     const timestamp = formatTimestamp(message.timestamp);
     
