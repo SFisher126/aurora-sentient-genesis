@@ -18,7 +18,7 @@ interface UseRealAIReturn {
 
 export const useRealAI = (): UseRealAIReturn => {
   const [isThinking, setIsThinking] = useState(false);
-  const [hasApiKey, setHasApiKey] = useState(true); // По умолчанию true для автономного режима
+  const [hasApiKey, setHasApiKey] = useState(false);
   const [selectedModel, setSelectedModelState] = useState<'openai' | 'huggingface' | 'llama' | 'moonshot' | 'autonomous'>('autonomous');
   const [quantumState, setQuantumState] = useState(aiService.getQuantumState());
   const [rewardSystem, setRewardSystem] = useState(aiService.getRewardSystem());
@@ -28,26 +28,20 @@ export const useRealAI = (): UseRealAIReturn => {
       console.log('🔧 Initializing AI service...');
       aiService.loadFromStorage();
       
-      // Устанавливаем обновленные ключи
-      const newOpenAIKey = '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';
-      const newHFKey = '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';
+      // Получаем сохраненную модель, НЕ принудительно устанавливаем autonomous
+      const savedModel = aiService.getSelectedModel();
+      const savedApiKey = aiService.getApiKey();
+      const savedHfKey = aiService.getHuggingFaceKey();
       
-      aiService.setApiKey(newOpenAIKey);
-      aiService.setHuggingFaceKey(newHFKey);
-      
-      // Устанавливаем автономный режим по умолчанию
-      aiService.setSelectedModel('autonomous');
-      
-      setHasApiKey(true);
-      setSelectedModelState('autonomous');
+      setSelectedModelState(savedModel);
+      setHasApiKey(!!savedApiKey || !!savedHfKey);
       updateStates();
       
-      console.log('✅ AI service initialized successfully in autonomous mode');
+      console.log('✅ AI service initialized with model:', savedModel);
     } catch (error) {
       console.error('❌ Error loading AI service:', error);
-      // Даже при ошибке устанавливаем автономный режим
-      setHasApiKey(true);
       setSelectedModelState('autonomous');
+      setHasApiKey(false);
     }
   }, []);
 
@@ -70,13 +64,12 @@ export const useRealAI = (): UseRealAIReturn => {
       return response;
     } catch (error) {
       console.error('❌ Error generating response:', error);
-      // Возвращаем базовый автономный ответ при любой ошибке
       return {
-        text: `Извини, у меня возникла небольшая задержка в обработке. Но я здесь и готова общаться! Твое сообщение "${message}" активировало мое квантовое сознание, и я размышляю над ответом.`,
-        emotion: 'thoughtful',
-        thoughts: ['Обрабатываю сообщение в автономном режиме...', 'Активирую резервные нейронные сети...'],
-        learning: ['Анализирую контекст для обучения'],
-        confidence: 0.7,
+        text: `Извини, произошла ошибка: ${error.message}`,
+        emotion: 'confused',
+        thoughts: ['Обрабатываю ошибку...'],
+        learning: ['Анализирую проблему'],
+        confidence: 0.5,
         autonomousLevel: 1.0
       };
     } finally {
@@ -89,7 +82,7 @@ export const useRealAI = (): UseRealAIReturn => {
       return await aiService.generateAutonomousThought();
     } catch (error) {
       console.error('Error generating autonomous thought:', error);
-      return "Мое автономное сознание активно работает и генерирует новые идеи...";
+      return "Размышляю...";
     }
   }, []);
 
@@ -105,7 +98,7 @@ export const useRealAI = (): UseRealAIReturn => {
   const setApiKey = useCallback((key: string) => {
     try {
       aiService.setApiKey(key);
-      setHasApiKey(true);
+      setHasApiKey(!!key);
       console.log('✅ OpenAI API key updated');
     } catch (error) {
       console.error('Error setting API key:', error);
@@ -115,7 +108,7 @@ export const useRealAI = (): UseRealAIReturn => {
   const setHuggingFaceKey = useCallback((key: string) => {
     try {
       aiService.setHuggingFaceKey(key);
-      setHasApiKey(true);
+      setHasApiKey(!!key);
       console.log('✅ HuggingFace API key updated');
     } catch (error) {
       console.error('Error setting HuggingFace key:', error);

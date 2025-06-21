@@ -12,8 +12,8 @@ import { useRealAI } from '../hooks/useRealAI';
 import { useToast } from '@/hooks/use-toast';
 
 const APISettings = () => {
-  const [openaiKey, setOpenaiKey] = useState('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');
-  const [huggingfaceKey, setHuggingfaceKey] = useState('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');
+  const [openaiKey, setOpenaiKey] = useState('');
+  const [huggingfaceKey, setHuggingfaceKey] = useState('');
   const [testResults, setTestResults] = useState<Record<string, string>>({});
   const [isTestingConnections, setIsTestingConnections] = useState(false);
 
@@ -30,31 +30,34 @@ const APISettings = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Автоматически устанавливаем ключи при загрузке
-    setApiKey(openaiKey);
-    setHuggingFaceKey(huggingfaceKey);
-    setSelectedModel('autonomous');
+    // Загружаем сохраненные ключи из localStorage
+    const savedOpenAI = localStorage.getItem('ai_api_key') || '';
+    const savedHF = localStorage.getItem('hf_api_key') || '';
     
-    // Устанавливаем успешный статус для автономного режима
-    setTestResults(prev => ({
-      ...prev,
-      autonomous: 'Автономный режим активен ✅'
-    }));
+    setOpenaiKey(savedOpenAI);
+    setHuggingfaceKey(savedHF);
     
-    console.log('🔑 API keys and autonomous mode initialized');
-  }, [setApiKey, setHuggingFaceKey, setSelectedModel]);
+    console.log('🔄 Loaded API keys from storage');
+  }, []);
 
   const handleSaveOpenAI = () => {
     setApiKey(openaiKey);
     toast({
-      description: "OpenAI ключ обновлен!",
+      description: "OpenAI ключ сохранен!",
     });
   };
 
   const handleSaveHuggingFace = () => {
     setHuggingFaceKey(huggingfaceKey);
     toast({
-      description: "HuggingFace ключ обновлен!",
+      description: "HuggingFace ключ сохранен!",
+    });
+  };
+
+  const handleModelChange = (model: string) => {
+    setSelectedModel(model as any);
+    toast({
+      description: `Модель изменена на ${model}`,
     });
   };
 
@@ -67,12 +70,11 @@ const APISettings = () => {
       
       switch (service) {
         case 'autonomous':
-          // Автономный режим всегда доступен
           testResult = 'Автономный режим активен ✅';
           break;
           
         case 'openai':
-          if (!openaiKey) {
+          if (!openaiKey.trim()) {
             testResult = 'Ключ не установлен ❌';
             break;
           }
@@ -91,24 +93,57 @@ const APISettings = () => {
               }),
             });
             
-            testResult = openaiResponse.ok ? 'OpenAI подключен ✅' : `Ошибка OpenAI: ${openaiResponse.status} ❌`;
+            if (openaiResponse.ok) {
+              testResult = 'OpenAI подключен ✅';
+            } else {
+              const errorData = await openaiResponse.json();
+              testResult = `Ошибка OpenAI: ${errorData.error?.message || openaiResponse.status} ❌`;
+            }
           } catch (error) {
-            testResult = 'OpenAI недоступен ❌';
+            testResult = `OpenAI недоступен: ${error.message} ❌`;
           }
           break;
 
         case 'huggingface':
+          if (!huggingfaceKey.trim()) {
+            testResult = 'Ключ не установлен ❌';
+            break;
+          }
+          
+          try {
+            const hfResponse = await fetch('https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${huggingfaceKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                inputs: 'Test',
+                parameters: { max_length: 10 }
+              }),
+            });
+            
+            if (hfResponse.ok) {
+              testResult = 'HuggingFace подключен ✅';
+            } else {
+              const errorData = await hfResponse.json();
+              testResult = `Ошибка HF: ${errorData.error || hfResponse.status} ❌`;
+            }
+          } catch (error) {
+            testResult = `HuggingFace недоступен: ${error.message} ❌`;
+          }
+          break;
+
         case 'llama':
         case 'moonshot':
-          // Эти сервисы могут быть недоступны, но мы показываем что ключ есть
-          testResult = 'Ключ установлен, API может быть недоступен ⚠️';
+          testResult = 'Модель в разработке ⚠️';
           break;
       }
       
       setTestResults(prev => ({ ...prev, [service]: testResult }));
       
     } catch (error) {
-      setTestResults(prev => ({ ...prev, [service]: `Ошибка: ${error} ❌` }));
+      setTestResults(prev => ({ ...prev, [service]: `Ошибка: ${error.message} ❌` }));
     }
     
     setIsTestingConnections(false);
@@ -144,7 +179,7 @@ const APISettings = () => {
               </h2>
               <Badge variant="outline" className="text-green-400 border-green-400">
                 <CheckCircle className="w-4 h-4 mr-1" />
-                Анюта активна
+                Система активна
               </Badge>
             </div>
 
@@ -165,7 +200,7 @@ const APISettings = () => {
 
             <div className="space-y-2">
               <Label htmlFor="model-select">Выбор модели ИИ</Label>
-              <Select value={selectedModel} onValueChange={(value: any) => setSelectedModel(value)}>
+              <Select value={selectedModel} onValueChange={handleModelChange}>
                 <SelectTrigger className="bg-gray-700 border-gray-600">
                   <SelectValue placeholder="Выберите модель" />
                 </SelectTrigger>
@@ -186,7 +221,7 @@ const APISettings = () => {
           <div className="p-6">
             <h2 className="text-xl font-semibold mb-4 flex items-center">
               <Zap className="w-5 h-5 mr-2 text-purple-400" />
-              Автономный режим (Активен)
+              Автономный режим
             </h2>
             
             <div className="space-y-4">
@@ -221,7 +256,7 @@ const APISettings = () => {
           <div className="p-6">
             <h2 className="text-xl font-semibold mb-4 flex items-center">
               <Key className="w-5 h-5 mr-2 text-blue-400" />
-              OpenAI API (Дополнительно)
+              OpenAI API
             </h2>
             
             <div className="space-y-4">
@@ -271,7 +306,7 @@ const APISettings = () => {
           <div className="p-6">
             <h2 className="text-xl font-semibold mb-4 flex items-center">
               <Globe className="w-5 h-5 mr-2 text-orange-400" />
-              HuggingFace API (Дополнительно)
+              HuggingFace API
             </h2>
             
             <div className="space-y-4">
