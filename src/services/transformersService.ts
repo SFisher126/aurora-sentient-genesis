@@ -1,8 +1,9 @@
 import { pipeline, env } from '@huggingface/transformers';
 
-// Конфигурация для работы в браузере
-env.allowRemoteModels = true;
-env.allowLocalModels = false;
+// Конфигурация для работы с локальными моделями
+env.allowRemoteModels = false;
+env.allowLocalModels = true;
+env.localModelPath = '/models/';
 
 class TransformersService {
   private textClassifier: any = null;
@@ -14,23 +15,29 @@ class TransformersService {
     if (this.initialized) return;
     
     try {
-      console.log('🤗 Initializing Transformers models...');
+      console.log('🤗 Initializing local Transformers models...');
       
-      // Инициализируем анализатор тональности
-      this.sentimentAnalyzer = await pipeline('sentiment-analysis', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english');
-      
-      // Инициализируем генератор текста с отключенной квантизацией
-      this.textGenerator = await pipeline('text-generation', 'Xenova/gpt2-small', {
-        quantized: false
+      // Инициализируем анализатор тональности с локальной моделью
+      this.sentimentAnalyzer = await pipeline('sentiment-analysis', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english', {
+        local_files_only: true
       });
       
-      // Инициализируем классификатор текста
-      this.textClassifier = await pipeline('text-classification', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english');
+      // Инициализируем генератор текста с локальной моделью
+      this.textGenerator = await pipeline('text-generation', 'Xenova/gpt2-small', {
+        quantized: false,
+        local_files_only: true
+      });
+      
+      // Инициализируем классификатор текста с локальной моделью
+      this.textClassifier = await pipeline('text-classification', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english', {
+        local_files_only: true
+      });
       
       this.initialized = true;
-      console.log('✅ Transformers models initialized successfully!');
+      console.log('✅ Local Transformers models initialized successfully!');
     } catch (error) {
-      console.error('❌ Error initializing Transformers:', error);
+      console.error('❌ Error initializing local Transformers:', error);
+      console.warn('💡 Make sure model files are placed in public/models/ directory');
     }
   }
 
