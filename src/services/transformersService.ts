@@ -20,7 +20,7 @@ class TransformersService {
       this.sentimentAnalyzer = await pipeline('sentiment-analysis', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english');
       
       // Инициализируем генератор текста с отключенной квантизацией
-      this.textGenerator = await pipeline('text-generation', 'Xenova/gpt2', {
+      this.textGenerator = await pipeline('text-generation', 'Xenova/gpt2-small', {
         quantized: false
       });
       
