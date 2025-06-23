@@ -1,9 +1,8 @@
-import { pipeline, env } from '@huggingface/transformers';
+import { pipeline, env } from '@xenova/transformers';
 
 // Конфигурация для работы с локальными моделями
-env.allowRemoteModels = false;
+env.allowRemoteModels = true;
 env.allowLocalModels = true;
-env.localModelPath = '/models/';
 
 class TransformersService {
   private textClassifier: any = null;
@@ -15,29 +14,22 @@ class TransformersService {
     if (this.initialized) return;
     
     try {
-      console.log('🤗 Initializing local Transformers models...');
+      console.log('🤗 Initializing Xenova Transformers models...');
       
-      // Инициализируем анализатор тональности с локальной моделью
-      this.sentimentAnalyzer = await pipeline('sentiment-analysis', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english', {
-        local_files_only: true
-      });
+      // Инициализируем анализатор тональности с Xenova моделью
+      this.sentimentAnalyzer = await pipeline('sentiment-analysis', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english');
       
-      // Инициализируем генератор текста с локальной моделью
-      this.textGenerator = await pipeline('text-generation', 'Xenova/gpt2-small', {
-        quantized: false,
-        local_files_only: true
-      });
+      // Инициализируем генератор текста с Xenova моделью
+      this.textGenerator = await pipeline('text-generation', 'Xenova/gpt2');
       
-      // Инициализируем классификатор текста с локальной моделью
-      this.textClassifier = await pipeline('text-classification', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english', {
-        local_files_only: true
-      });
+      // Инициализируем классификатор текста с Xenova моделью
+      this.textClassifier = await pipeline('text-classification', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english');
       
       this.initialized = true;
-      console.log('✅ Local Transformers models initialized successfully!');
+      console.log('✅ Xenova Transformers models initialized successfully!');
     } catch (error) {
-      console.error('❌ Error initializing local Transformers:', error);
-      console.warn('💡 Make sure model files are placed in public/models/ directory');
+      console.error('❌ Error initializing Xenova Transformers:', error);
+      console.warn('💡 Models will be downloaded from Hugging Face Hub automatically');
     }
   }
 
