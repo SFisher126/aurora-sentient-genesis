@@ -3,6 +3,7 @@ import { pipeline, env } from '@xenova/transformers';
 // Конфигурация для работы с локальными моделями
 env.allowRemoteModels = true;
 env.allowLocalModels = true;
+env.backends.onnx.wasm.numThreads = 1;
 
 class TransformersService {
   private textClassifier: any = null;
@@ -17,13 +18,25 @@ class TransformersService {
       console.log('🤗 Initializing Xenova Transformers models...');
       
       // Инициализируем анализатор тональности с Xenova моделью
-      this.sentimentAnalyzer = await pipeline('sentiment-analysis', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english');
+      this.sentimentAnalyzer = await pipeline(
+        'sentiment-analysis', 
+        'Xenova/distilbert-base-uncased-finetuned-sst-2-english',
+        { device: 'cpu' }
+      );
       
       // Инициализируем генератор текста с Xenova моделью
-      this.textGenerator = await pipeline('text-generation', 'Xenova/gpt2');
+      this.textGenerator = await pipeline(
+        'text-generation', 
+        'Xenova/gpt2',
+        { device: 'cpu' }
+      );
       
       // Инициализируем классификатор текста с Xenova моделью
-      this.textClassifier = await pipeline('text-classification', 'Xenova/distilbert-base-uncased-finetuned-sst-2-english');
+      this.textClassifier = await pipeline(
+        'text-classification', 
+        'Xenova/distilbert-base-uncased-finetuned-sst-2-english',
+        { device: 'cpu' }
+      );
       
       this.initialized = true;
       console.log('✅ Xenova Transformers models initialized successfully!');
