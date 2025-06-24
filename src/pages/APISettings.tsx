@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,19 +6,19 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Key, Brain, Zap, Settings, Globe, Rocket, Moon, CheckCircle, AlertCircle } from 'lucide-react';
+import { Key, Brain, Zap, Settings, Globe, CheckCircle, AlertCircle } from 'lucide-react';
 import { useRealAI } from '../hooks/useRealAI';
 import { useToast } from '@/hooks/use-toast';
 
 const APISettings = () => {
   const [openaiKey, setOpenaiKey] = useState('');
-  const [huggingfaceKey, setHuggingfaceKey] = useState('');
+  const [langdockKey, setLangdockKey] = useState('');
   const [testResults, setTestResults] = useState<Record<string, string>>({});
   const [isTestingConnections, setIsTestingConnections] = useState(false);
 
   const {
     setApiKey,
-    setHuggingFaceKey,
+    setLangdockKey: setLangdockKeyHook,
     setSelectedModel,
     hasApiKey,
     selectedModel,
@@ -30,12 +29,11 @@ const APISettings = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Загружаем сохраненные ключи из localStorage
     const savedOpenAI = localStorage.getItem('ai_api_key') || '';
-    const savedHF = localStorage.getItem('hf_api_key') || '';
+    const savedLangdock = localStorage.getItem('langdock_api_key') || '';
     
     setOpenaiKey(savedOpenAI);
-    setHuggingfaceKey(savedHF);
+    setLangdockKey(savedLangdock);
     
     console.log('🔄 Loaded API keys from storage');
   }, []);
@@ -63,26 +61,26 @@ const APISettings = () => {
     });
   };
 
-  const handleSaveHuggingFace = () => {
-    if (!huggingfaceKey.trim()) {
+  const handleSaveLangdock = () => {
+    if (!langdockKey.trim()) {
       toast({
         variant: "destructive",
-        description: "Введите валидный HuggingFace ключ",
+        description: "Введите валидный Langdock ключ",
       });
       return;
     }
     
-    if (!huggingfaceKey.startsWith('hf_')) {
+    if (!langdockKey.startsWith('sk-')) {
       toast({
         variant: "destructive",
-        description: "HuggingFace ключ должен начинаться с 'hf_'",
+        description: "Langdock ключ должен начинаться с 'sk-'",
       });
       return;
     }
     
-    setHuggingFaceKey(huggingfaceKey);
+    setLangdockKeyHook(langdockKey);
     toast({
-      description: "HuggingFace ключ сохранен!",
+      description: "Langdock ключ сохранен!",
     });
   };
 
@@ -93,7 +91,7 @@ const APISettings = () => {
     });
   };
 
-  const testConnection = async (service: 'openai' | 'huggingface' | 'llama' | 'moonshot' | 'autonomous') => {
+  const testConnection = async (service: 'openai' | 'langdock' | 'autonomous') => {
     setIsTestingConnections(true);
     setTestResults(prev => ({ ...prev, [service]: 'Тестирование...' }));
 
@@ -136,39 +134,35 @@ const APISettings = () => {
           }
           break;
 
-        case 'huggingface':
-          if (!huggingfaceKey.trim() || !huggingfaceKey.startsWith('hf_')) {
-            testResult = 'Неверный ключ HuggingFace ❌';
+        case 'langdock':
+          if (!langdockKey.trim() || !langdockKey.startsWith('sk-')) {
+            testResult = 'Неверный ключ Langdock ❌';
             break;
           }
           
           try {
-            const hfResponse = await fetch('https://api-inference.huggingface.co/models/microsoft/DialoGPT-small', {
+            const langdockResponse = await fetch('https://api.langdock.com/v1/chat/completions', {
               method: 'POST',
               headers: {
-                'Authorization': `Bearer ${huggingfaceKey}`,
+                'Authorization': `Bearer ${langdockKey}`,
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                inputs: 'Test',
-                parameters: { max_new_tokens: 10 }
+                model: 'gpt-4o-mini',
+                messages: [{ role: 'user', content: 'Test' }],
+                max_tokens: 5,
               }),
             });
             
-            if (hfResponse.ok) {
-              testResult = 'HuggingFace подключен ✅';
+            if (langdockResponse.ok) {
+              testResult = 'Langdock подключен ✅';
             } else {
-              const errorText = await hfResponse.text();
-              testResult = `Ошибка HF: ${errorText} ❌`;
+              const errorText = await langdockResponse.text();
+              testResult = `Ошибка Langdock: ${errorText} ❌`;
             }
           } catch (error) {
-            testResult = `HuggingFace недоступен: ${error.message} ❌`;
+            testResult = `Langdock недоступен: ${error.message} ❌`;
           }
-          break;
-
-        case 'llama':
-        case 'moonshot':
-          testResult = 'Модель в разработке ⚠️';
           break;
       }
       
@@ -185,9 +179,7 @@ const APISettings = () => {
     await Promise.all([
       testConnection('autonomous'),
       testConnection('openai'),
-      testConnection('huggingface'),
-      testConnection('llama'),
-      testConnection('moonshot')
+      testConnection('langdock')
     ]);
   };
 
@@ -238,10 +230,8 @@ const APISettings = () => {
                 </SelectTrigger>
                 <SelectContent className="bg-gray-800 border-gray-600">
                   <SelectItem value="openai">🧠 OpenAI GPT-4</SelectItem>
-                  <SelectItem value="huggingface">🤗 HuggingFace</SelectItem>
+                  <SelectItem value="langdock">🚀 Langdock</SelectItem>
                   <SelectItem value="autonomous">🤖 Автономная</SelectItem>
-                  <SelectItem value="llama">🦙 Llama-3-8B</SelectItem>
-                  <SelectItem value="moonshot">🌙 Moonshot Kimi-72B</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -298,41 +288,41 @@ const APISettings = () => {
           </div>
         </Card>
 
-        {/* HuggingFace настройки */}
+        {/* Langdock настройки */}
         <Card className="bg-gray-800/50 border-gray-700/50">
           <div className="p-6">
             <h2 className="text-xl font-semibold mb-4 flex items-center">
               <Globe className="w-5 h-5 mr-2 text-orange-400" />
-              HuggingFace API
+              Langdock API
             </h2>
             
             <div className="space-y-4">
               <div>
-                <Label htmlFor="hf-key">API Ключ</Label>
+                <Label htmlFor="langdock-key">API Ключ</Label>
                 <div className="flex gap-2 mt-1">
                   <Input
-                    id="hf-key"
+                    id="langdock-key"
                     type="password"
-                    value={huggingfaceKey}
-                    onChange={(e) => setHuggingfaceKey(e.target.value)}
-                    placeholder="hf_..."
+                    value={langdockKey}
+                    onChange={(e) => setLangdockKey(e.target.value)}
+                    placeholder="sk-..."
                     className="bg-gray-700 border-gray-600 text-white"
                   />
-                  <Button onClick={handleSaveHuggingFace} className="bg-orange-600 hover:bg-orange-700">
+                  <Button onClick={handleSaveLangdock} className="bg-orange-600 hover:bg-orange-700">
                     Сохранить
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => testConnection('huggingface')}
+                    onClick={() => testConnection('langdock')}
                     disabled={isTestingConnections}
                     className="border-gray-600"
                   >
                     Тест
                   </Button>
                 </div>
-                {testResults.huggingface && (
-                  <p className={`text-sm mt-1 ${testResults.huggingface.includes('✅') ? 'text-green-400' : 'text-yellow-400'}`}>
-                    {testResults.huggingface}
+                {testResults.langdock && (
+                  <p className={`text-sm mt-1 ${testResults.langdock.includes('✅') ? 'text-green-400' : 'text-yellow-400'}`}>
+                    {testResults.langdock}
                   </p>
                 )}
               </div>
@@ -340,7 +330,8 @@ const APISettings = () => {
               <Alert>
                 <AlertCircle className="w-4 h-4" />
                 <AlertDescription>
-                  HuggingFace бесплатный API. Ключ должен начинаться с 'hf_'.
+                  Langdock - альтернативный API для доступа к моделям. 
+                  Ключ должен начинаться с 'sk-'.
                 </AlertDescription>
               </Alert>
             </div>

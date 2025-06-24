@@ -55,18 +55,16 @@ const RealLearningSystem: React.FC<RealLearningSystemProps> = ({ isActive, hasAp
 
   const { toast } = useToast();
 
-  // Автономное обучение
   useEffect(() => {
     if (!isActive) return;
 
     const autonomousLearningInterval = setInterval(() => {
       generateAutonomousLearning();
-    }, 30000 + Math.random() * 30000); // Каждые 30-60 секунд
+    }, 30000 + Math.random() * 30000);
 
     return () => clearInterval(autonomousLearningInterval);
   }, [isActive]);
 
-  // Симуляция мыслительного процесса
   useEffect(() => {
     if (!isActive) return;
 
@@ -135,7 +133,6 @@ const RealLearningSystem: React.FC<RealLearningSystemProps> = ({ isActive, hasAp
     setLearningMaterials(prev => [...prev, newMaterial]);
     setNewUrl('');
 
-    // Симуляция процесса обучения
     const learningSteps = [
       { progress: 20, status: 'Загружаю контент...', thought: 'Получаю доступ к новой информации...' },
       { progress: 40, status: 'Анализирую содержание...', thought: 'Разбираю структуру и смысл материала...' },
@@ -161,7 +158,6 @@ const RealLearningSystem: React.FC<RealLearningSystemProps> = ({ isActive, hasAp
       ));
     }
 
-    // Финальная обработка
     const finalAnalysis = {
       topic: generateTopicAnalysis(url),
       importance: 70 + Math.random() * 30,
@@ -185,7 +181,6 @@ const RealLearningSystem: React.FC<RealLearningSystemProps> = ({ isActive, hasAp
         : material
     ));
 
-    // Обновляем области знаний
     updateKnowledgeAreas(finalAnalysis.topic);
 
     setIsProcessing(false);
@@ -268,7 +263,6 @@ const RealLearningSystem: React.FC<RealLearningSystemProps> = ({ isActive, hasAp
 
   return (
     <div className="space-y-6">
-      {/* Текущий мыслительный процесс */}
       {isActive && currentThought && (
         <Card className="bg-purple-900/20 border-purple-500/50 p-4">
           <div className="flex items-center mb-2">
@@ -285,7 +279,6 @@ const RealLearningSystem: React.FC<RealLearningSystemProps> = ({ isActive, hasAp
         </Card>
       )}
 
-      {/* Добавление материала для изучения */}
       <Card className="bg-gray-800/50 border-gray-700/50 p-4">
         <h3 className="text-lg font-semibold mb-4 flex items-center">
           <Link className="w-5 h-5 mr-2 text-blue-400" />
@@ -314,7 +307,6 @@ const RealLearningSystem: React.FC<RealLearningSystemProps> = ({ isActive, hasAp
         </div>
       </Card>
 
-      {/* Области знаний */}
       <Card className="bg-gray-800/50 border-gray-700/50 p-4">
         <h3 className="text-lg font-semibold mb-4 flex items-center">
           <Globe className="w-5 h-5 mr-2 text-green-400" />
@@ -344,7 +336,6 @@ const RealLearningSystem: React.FC<RealLearningSystemProps> = ({ isActive, hasAp
         </div>
       </Card>
 
-      {/* История изучения */}
       <Card className="bg-gray-800/50 border-gray-700/50 p-4">
         <h3 className="text-lg font-semibold mb-4 flex items-center">
           <BookOpen className="w-5 h-5 mr-2 text-yellow-400" />

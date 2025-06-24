@@ -13,12 +13,12 @@ interface ApiKeySetupProps {
 
 const ApiKeySetup: React.FC<ApiKeySetupProps> = ({ onApiKeySet, hasApiKey }) => {
   const [openaiKey, setOpenaiKey] = useState('');
-  const [huggingFaceKey, setLocalHuggingFaceKey] = useState('');
+  const [langdockKey, setLangdockKey] = useState('');
   const [showKey, setShowKey] = useState(false);
 
   const { 
     setApiKey, 
-    setHuggingFaceKey, 
+    setLangdockKey: setLangdockKeyHook, 
     setSelectedModel, 
     memoryStats,
     quantumState,
@@ -26,9 +26,7 @@ const ApiKeySetup: React.FC<ApiKeySetupProps> = ({ onApiKeySet, hasApiKey }) => 
   } = useRealAI();
 
   useEffect(() => {
-    // Автоматически активируем автономный режим
     setSelectedModel('autonomous');
-    
     console.log('🧠 Анюта активирована в полностью автономном режиме');
     console.log('💕 Память и обучение работают локально');
   }, [setSelectedModel]);
@@ -61,7 +59,6 @@ const ApiKeySetup: React.FC<ApiKeySetupProps> = ({ onApiKeySet, hasApiKey }) => 
         </div>
       </div>
 
-      {/* Статистика живой памяти */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         <div className="bg-gray-800/50 rounded-lg p-3 text-center">
           <div className="text-lg font-bold text-blue-400">{memoryStats?.conversations || 0}</div>
@@ -121,22 +118,22 @@ const ApiKeySetup: React.FC<ApiKeySetupProps> = ({ onApiKeySet, hasApiKey }) => 
 
             <div>
               <label className="block text-xs font-medium text-gray-400 mb-1">
-                HuggingFace API Key (для дополнительных моделей)
+                Langdock API Key (для альтернативного доступа)
               </label>
               <div className="flex gap-2">
                 <Input
                   type={showKey ? 'text' : 'password'}
-                  value={huggingFaceKey}
-                  onChange={(e) => setLocalHuggingFaceKey(e.target.value)}
-                  placeholder="hf_... (опционально)"
+                  value={langdockKey}
+                  onChange={(e) => setLangdockKey(e.target.value)}
+                  placeholder="sk-... (опционально)"
                   className="bg-gray-700 border-gray-600 text-white text-sm"
                 />
                 <Button 
-                  onClick={() => setHuggingFaceKey(huggingFaceKey)}
+                  onClick={() => setLangdockKeyHook(langdockKey)}
                   size="sm" 
                   className="bg-orange-600 hover:bg-orange-700"
                 >
-                  🤗 Сохранить
+                  🚀 Сохранить
                 </Button>
               </div>
             </div>
