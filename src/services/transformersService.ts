@@ -4,6 +4,8 @@ import { pipeline, env } from '@xenova/transformers';
 env.allowRemoteModels = true;
 env.allowLocalModels = true;
 env.backends.onnx.wasm.numThreads = 1;
+// Устанавливаем CDN для ONNX Runtime WebAssembly файлов
+env.remoteHost = 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/';
 
 class TransformersService {
   private textClassifier: any = null;
